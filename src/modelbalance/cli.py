@@ -1,4 +1,4 @@
-"""命令行入口：查询余额、查看/记录用量、实时监控、Web 仪表盘。"""
+"""命令行入口：查询余额、查看/记录用量、实时监控、Web 仪表盘、桌面应用。"""
 from __future__ import annotations
 
 import argparse
@@ -113,6 +113,15 @@ def cmd_web(args) -> int:
     return serve(host=args.host, port=args.port, interval=args.interval, save=args.save)
 
 
+def cmd_app(args) -> int:
+    try:
+        from .app import run_app
+    except ImportError as exc:
+        print(f"无法启动桌面应用: {exc}")
+        return 1
+    return run_app(interval=args.interval, save=args.save)
+
+
 def cmd_init_db(args) -> int:
     init_db()
     print("数据库已初始化")
@@ -146,12 +155,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_watch.add_argument("--save", action="store_true", help="每次轮询保存快照")
     p_watch.set_defaults(func=cmd_watch)
 
-    p_web = sub.add_parser("web", help="启动本地 Web 仪表盘（实时刷新）")
+    p_web = sub.add_parser("web", help="启动本地 Web 仪表盘（可选）")
     p_web.add_argument("--host", default="127.0.0.1")
     p_web.add_argument("--port", type=int, default=8000)
     p_web.add_argument("--interval", type=int, default=30, help="页面自动刷新秒数")
     p_web.add_argument("--save", action="store_true", help="每次查询保存余额快照")
     p_web.set_defaults(func=cmd_web)
+
+    p_app = sub.add_parser("app", help="启动桌面应用（推荐）")
+    p_app.add_argument("--interval", type=int, default=30, help="自动刷新秒数")
+    p_app.add_argument("--save", action="store_true", help="每次查询保存余额快照")
+    p_app.set_defaults(func=cmd_app)
 
     p_db = sub.add_parser("init-db", help="初始化本地数据库")
     p_db.set_defaults(func=cmd_init_db)
