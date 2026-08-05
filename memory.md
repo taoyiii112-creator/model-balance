@@ -9,7 +9,8 @@
 
 # 当前状态
 
-- 2026-08-06：展示层落地为本地 Web 仪表盘（web 命令，纯标准库，页面自动刷新）；新增 OpenAI 官方余额适配器（待真实 Key 验证）；.env 模板已生成待填 Key。
+- 2026-08-06：DeepSeek 真实余额验证通过（余额约 0.36 元，官方接口实时返回，CLI 与 Web 仪表盘均正常显示）。代码已上传 GitHub（https://github.com/taoyiii112-creator/model-balance，main 分支）。
+- 2026-08-06：展示层落地为本地 Web 仪表盘；新增 OpenAI 官方余额适配器（待验证）。
 - 2026-08-06：第一阶段骨架完成（DeepSeek / 中转渠道适配器 + CLI + SQLite）。
 - 2026-08-05：项目初始化完成；项目按要求迁移至 D:\codexproject\模型余额。
 
@@ -32,14 +33,14 @@
 
 # 已知问题
 
-- 各提供商余额接口不统一：DeepSeek、OpenAI（不稳定）、中转渠道有接口；Anthropic / Gemini / 通义 / Kimi 无公开余额接口。
-- OpenAI credit_grants 接口历史上对部分 API Key 不稳定，需真实 Key 验证，不行则走中转渠道。
-- Token 用量目前靠手动记录（add-usage），自动采集需接入代理层或渠道用量接口。
-- 真实接口验证需要用户提供 API Key 并允许访问对应域名。
+- DeepSeek 官方余额接口只返回总额/可用，不返回"已用金额"，已用列显示"-"；消费统计靠 Token 用量本地记录。
+- 各提供商余额接口不统一：Anthropic / Gemini / 通义 / Kimi 无公开余额接口。
+- OpenAI credit_grants 接口历史上对部分 API Key 不稳定，待真实 Key 验证。
+- 中转渠道适配器按 one-api / new-api 约定实现，其他渠道响应结构可能不同。
 
 # 下一步计划
 
-1. 上传 GitHub（待用户提供仓库地址并授权网络访问）。
-2. 用户填写 .env 的 API Key 后，用真实接口验证 DeepSeek / OpenAI / 中转渠道。
-3. 按需扩展更多提供商；多数主流平台无余额接口，重点放在渠道与用量统计。
+1. 接入中转渠道：用户提供真实 base_url 并填 RELAY_API_KEY 后验证。
+2. 可选：OpenAI 官方 Key 验证。
+3. Token 用量自动采集（代理层或渠道用量接口）。
 4. 余额趋势图与低余额告警。
