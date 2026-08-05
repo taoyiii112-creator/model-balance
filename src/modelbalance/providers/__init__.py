@@ -4,10 +4,12 @@ from __future__ import annotations
 from ..config import Account
 from .base import Provider, ProviderError
 from .deepseek import DeepSeekProvider
+from .openai import OpenAIProvider
 from .openai_compat import OpenAICompatProvider
 
 REGISTRY: dict[str, type[Provider]] = {
     DeepSeekProvider.name: DeepSeekProvider,
+    OpenAIProvider.name: OpenAIProvider,
     OpenAICompatProvider.name: OpenAICompatProvider,
 }
 

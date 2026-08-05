@@ -91,5 +91,22 @@ class TestStorage(unittest.TestCase):
         self.assertAlmostEqual(totals["cost"], 0.12)
 
 
+class TestOpenAIParse(unittest.TestCase):
+    def test_parse(self):
+        from modelbalance.providers.openai import parse_balance
+
+        b = parse_balance("oa-1", {"total_granted": 100.0, "total_used": 30.0, "total_available": 70.0})
+        self.assertAlmostEqual(b.available, 70.0)
+        self.assertAlmostEqual(b.used, 30.0)
+        self.assertAlmostEqual(b.total, 100.0)
+        self.assertEqual(b.currency, "USD")
+
+    def test_bad_payload(self):
+        from modelbalance.providers.base import ProviderError
+        from modelbalance.providers.openai import parse_balance
+
+        with self.assertRaises(ProviderError):
+            parse_balance("oa-1", {"foo": 1})
+
 if __name__ == "__main__":
     unittest.main()
