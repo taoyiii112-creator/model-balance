@@ -42,7 +42,7 @@ th{background:#1e293b}.err{color:#f87171}.ok{color:#4ade80}#meta{color:#94a3b8;f
 <tbody></tbody>
 </table>
 <script>
-const REFRESH = {interval};
+const REFRESH = __INTERVAL__;
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function money(v){return v == null ? '-' : Number(v).toFixed(4);}
 async function refresh(){
@@ -91,7 +91,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/":
-            self._send(PAGE_TEMPLATE.format(interval=self.interval), "text/html; charset=utf-8")
+            self._send(PAGE_TEMPLATE.replace("__INTERVAL__", str(self.interval)), "text/html; charset=utf-8")
         elif path == "/api/balances":
             self._send(json.dumps(self._balances(), ensure_ascii=False), "application/json; charset=utf-8")
         elif path == "/api/usage":
