@@ -16,7 +16,7 @@ Windows 桌面应用，实时获取模型 API 账户余额与用量：
 - OpenAI 兼容中转渠道（one-api / new-api 类）余额查询
 - 本地 SQLite 记录 Token 用量与余额快照
 - CLI 单次查询、实时轮询监控（watch）
-- 可选：本地 Web 仪表盘（web 命令）
+- 可选：本地 Web 仪表盘（网页版，双击 `启动网页版.bat` 自动打开浏览器）
 
 ## 快速开始
 
