@@ -4,6 +4,9 @@
 *.key
 *.pem
 
+# 本地数据
+data/
+
 # Python
 __pycache__/
 *.py[cod]

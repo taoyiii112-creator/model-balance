@@ -1,0 +1,19 @@
+{
+  "accounts": [
+    {
+      "name": "deepseek-main",
+      "provider": "deepseek",
+      "api_key_env": "DEEPSEEK_API_KEY"
+    },
+    {
+      "name": "relay-openai",
+      "provider": "openai_compat",
+      "api_key_env": "RELAY_API_KEY",
+      "base_url": "https://your-relay.example.com",
+      "extra": {
+        "quota_denominator": 500000,
+        "quota_currency": "CNY"
+      }
+    }
+  ]
+}

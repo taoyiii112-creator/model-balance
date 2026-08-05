@@ -1,5 +1,13 @@
 # 开发记录
 
+## 日期：2026-08-06
+
+完成：第一阶段骨架。选定技术栈（Python 3 标准库 + SQLite，CLI 先行）；实现 DeepSeek 与 OpenAI 兼容中转渠道余额查询、Token 用量本地记录、watch 实时轮询。
+
+影响：核心链路（余额查询 + 用量记录）可离线演示；真实接口验证待用户提供 API Key。
+
+备注：应用形态（Web / 桌面 / CLI）仍未确认，展示层后置；项目按用户要求固定在 D:\codexproject\模型余额。
+
 ## 日期：2026-08-05
 
 完成：项目初始化。创建 README / memory / todo / summary 四件套文档，初始化 Git 仓库（main 分支）。
