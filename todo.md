@@ -2,7 +2,7 @@
 
 - 接入中转渠道：填 RELAY_API_KEY，并把 config.json 的 base_url 改成真实地址（待用户提供）
 - 可选：OpenAI 官方（填 OPENAI_API_KEY 后验证）
-- 手机 App（Flutter）：APK 已打包（release，debug 签名），待实机安装验证
+- 手机 App（Flutter）：实机验证中——已修复发布版网络权限并重新打包，待重装新 APK 确认
 
 # 待完成
 

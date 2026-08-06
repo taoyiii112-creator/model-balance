@@ -2,6 +2,14 @@
 
 ## 日期：2026-08-07
 
+完成：手机 App 实机首测发现发布版无法联网查询余额——Flutter 默认只在 debug 清单提供 INTERNET 权限，release 打包缺失；已在主 AndroidManifest 补上权限并重新打包（应用名同步改为「模型余额」），commit ba7924f。
+
+影响：修复后 release APK 可正常访问 api.deepseek.com 等余额接口。
+
+备注：待用户重装新 APK 实机确认。
+
+## 日期：2026-08-07
+
 完成：手机 App APK 打包成功。安装 Android SDK 36.1.0（D:\Android\Sdk，含 platform-tools / Android 36 平台 / build-tools 36.1.0）；因 services.gradle.org 直连下载失败，将 Gradle 发行版切到腾讯镜像、Maven 依赖切到阿里云镜像（配置已写入 App README）；flutter build apk 产出 release 安装包 app-release.apk（48.7MB，debug 签名，可直接安装）。
 
 影响：模型余额手机 App 可安装到 Android 手机实机使用。
