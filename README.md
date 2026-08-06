@@ -69,3 +69,7 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --prompt 1
 
 - Python 3.10+（Windows 自带 Tkinter；项目已内置运行时可用）
 - Windows / macOS / Linux 均可（桌面应用面向 Windows）
+
+## 备注 / 相关项目
+
+本应用另有手机端（Flutter）项目：`D:\codexProject\model_balance_app`，独立项目，支持 Android / iOS，详见该目录 README.md。
