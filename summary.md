@@ -1,5 +1,29 @@
 # 开发记录
 
+## 日期：2026-08-07
+
+完成：手机 App APK 打包成功。安装 Android SDK 36.1.0（D:\Android\Sdk，含 platform-tools / Android 36 平台 / build-tools 36.1.0）；因 services.gradle.org 直连下载失败，将 Gradle 发行版切到腾讯镜像、Maven 依赖切到阿里云镜像（配置已写入 App README）；flutter build apk 产出 release 安装包 app-release.apk（48.7MB，debug 签名，可直接安装）。
+
+影响：模型余额手机 App 可安装到 Android 手机实机使用。
+
+备注：当前为 debug 签名，正式发布需配置正式签名密钥；待实机验证功能。
+
+## 日期：2026-08-07
+
+完成：手机 App 工程化。安装 Flutter SDK 3.44.8（D:\flutter\flutter，使用中国镜像 pub.flutter-io.cn / storage.flutter-io.cn）；flutter create 生成 android/ios 平台工程；flutter analyze 零问题；flutter test 7 个测试全部通过。
+
+影响：模型余额手机 App 从纯代码骨架变为可编译验证的工程，可在 VS Code 中打开开发调试。
+
+备注：Android SDK 未安装，打包 APK 待装工具链（可后续安装 Android Studio 或 commandline-tools）。
+
+## 日期：2026-08-06
+
+完成：新增手机 App（Flutter）项目 D:\codexProject\model_balance_app：余额实时查询（DeepSeek / OpenAI / 中转渠道）、Token 用量记录（SQLite）、API Key 安全存储、账户管理，并附解析单测与首页 Widget 测试。
+
+影响：模型余额可在手机端实时查看，复用桌面版的多提供商适配器设计。
+
+备注：本机尚未安装 Flutter SDK 与 Android 工具链，待安装后运行 flutter pub get / test / analyze 验证并打包 APK。
+
 ## 日期：2026-08-06
 
 完成：新增 Windows 桌面应用（Tkinter 界面，余额表 + 用量表 + 自动刷新，后台线程查询不卡界面），通过真实数据验证（DeepSeek 余额 0.30 元）。用户确认应用形态为桌面应用，Web 仪表盘降为可选。

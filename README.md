@@ -72,4 +72,4 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --prompt 1
 
 ## 备注 / 相关项目
 
-本应用另有手机端（Flutter）项目：`D:\codexProject\model_balance_app`，独立项目，支持 Android / iOS，详见该目录 README.md。
+本应用另有手机端（Flutter）项目：`D:\codexProject\model_balance_app`，独立项目，支持 Android / iOS，详见该目录 README.md。Flutter 3.44.8 已安装并通过 `flutter analyze`（零问题）与 `flutter test`（7 个测试通过）；Android SDK 待装，装后即可 `flutter build apk` 打包。

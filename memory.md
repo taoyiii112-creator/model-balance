@@ -10,6 +10,9 @@
 
 # 当前状态
 
+- 2026-08-07：手机 App APK 打包成功（app-release.apk 48.7MB，Android SDK 36.1.0 + 腾讯/阿里云构建镜像），待实机安装验证。
+- 2026-08-07：手机 App 工程化完成——Flutter 3.44.8 已装（中国镜像）、android/ios 平台工程已生成、flutter analyze 零问题、7 个测试通过；Android 工具链待装。
+- 2026-08-06：新增手机 App（Flutter）项目 D:\codexProject\model_balance_app，复用桌面版查询逻辑（DeepSeek / OpenAI / 中转渠道 + Token 用量记录），待安装 Flutter SDK 后构建验证。
 - 2026-08-06：桌面应用完成并通过真实数据验证（DeepSeek 余额 0.30 元实时显示）。入口：双击 启动仪表盘.bat 或 python run.py app。
 - 2026-08-06：DeepSeek 真实余额验证通过；代码已上传 GitHub（https://github.com/taoyiii112-creator/model-balance）。
 - 2026-08-06：展示层曾落地为 Web 仪表盘（保留为可选），用户确认要桌面应用后新增 Tkinter 界面。
@@ -28,6 +31,7 @@
 # 开发规范
 
 - 文档与代码同步维护（README / memory / todo / summary 四件套）。
+- 子项目（如手机 App `D:\codexProject\model_balance_app`）不重复建四件套：仅保留 README.md，进度文档由父项目统一维护，并在子项目 README 中说明。
 - Git 提交信息用中文，遵循 feat: / fix: / refactor: / docs: / chore: / test: 前缀。
 - 敏感信息（API Key、Token）一律放 .env，永不提交到 Git。
 - 一个提交只做一件事。
