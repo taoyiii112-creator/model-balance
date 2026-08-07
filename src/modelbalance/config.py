@@ -8,8 +8,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 if getattr(sys, "frozen", False):
-    # PyInstaller 打包后：数据/配置放在 exe 同目录，保证持久化
-    PROJECT_ROOT = Path(sys.executable).resolve().parent
+    # PyInstaller 打包后：优先使用"exe 上级目录 = 项目根"（自用/开发场景），
+    # 否则回退到 exe 同目录（对外分发场景，配置放 exe 旁边）。
+    exe_dir = Path(sys.executable).resolve().parent
+    parent = exe_dir.parent
+    if (parent / "config.json").exists() or (parent / ".env").exists() or (parent / "src").exists():
+        PROJECT_ROOT = parent
+    else:
+        PROJECT_ROOT = exe_dir
 else:
     PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
