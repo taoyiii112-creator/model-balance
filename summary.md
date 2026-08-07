@@ -2,6 +2,14 @@
 
 ## 日期：2026-08-07
 
+完成：手机 App 用量页新增图表——按天柱状图（消费金额 / Token 可切换）与 Token 构成扇形图（输入命中缓存 / 未命中缓存 / 输出）；UsageRecord 与 SQLite 增加缓存 Token 字段（v2 迁移），记录对话框拆分输入 Token。analyze 零问题、11 个测试通过，APK 已重新打包（49.6MB）。
+
+影响：Token 用量从纯列表升级为可视化统计，可直观看到每日消费与 Token 构成。
+
+备注：余额趋势图与低余额告警仍待做。
+
+## 日期：2026-08-07
+
 完成：手机 App 实机首测发现发布版无法联网查询余额——Flutter 默认只在 debug 清单提供 INTERNET 权限，release 打包缺失；已在主 AndroidManifest 补上权限并重新打包（应用名同步改为「模型余额」），commit ba7924f。
 
 影响：修复后 release APK 可正常访问 api.deepseek.com 等余额接口。
