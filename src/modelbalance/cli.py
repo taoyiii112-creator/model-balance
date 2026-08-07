@@ -139,6 +139,21 @@ def cmd_proxy(args) -> int:
     return run_proxy(host=args.host, port=args.port)
 
 
+def cmd_set_update_source(args) -> int:
+    from .updater import get_update_source, set_update_source
+
+    if args.url is None:
+        print(f"当前更新源: {get_update_source()}")
+        return 0
+    if args.url == "reset":
+        set_update_source("")
+        print(f"已恢复默认更新源: {get_update_source()}")
+        return 0
+    set_update_source(args.url)
+    print(f"更新源已设置: {args.url}")
+    return 0
+
+
 def cmd_init_db(args) -> int:
     init_db()
     print("数据库已初始化")
@@ -190,6 +205,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_proxy.add_argument("--host", default="127.0.0.1")
     p_proxy.add_argument("--port", type=int, default=8001)
     p_proxy.set_defaults(func=cmd_proxy)
+
+    p_sus = sub.add_parser("set-update-source", help="查看/设置桌面版更新源地址")
+    p_sus.add_argument("url", nargs="?", help="更新源 URL；reset 恢复默认；不带参数查看当前")
+    p_sus.set_defaults(func=cmd_set_update_source)
 
     p_db = sub.add_parser("init-db", help="初始化本地数据库")
     p_db.set_defaults(func=cmd_init_db)

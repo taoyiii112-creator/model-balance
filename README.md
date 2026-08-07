@@ -79,9 +79,12 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 
 1. 修改 `src/modelbalance/__init__.py` 的 `__version__`（如 0.2.1）。
 2. 双击 `打包更新包.bat`（生成 `dist/model-balance-<版本>.zip`）。
-3. 在 GitHub 仓库创建 Release：tag 填 `v<版本>`，上传 zip，描述里写更新内容（App 更新弹窗会显示）。
+3. 在 GitHub 仓库创建 Release：**Tag 字段**填 `v<版本>`（注意是最上面那个 Tag 输入框，不是标题框），上传 zip 到下方"二进制附件区"（不要拖进说明框），描述里写更新内容（App 更新弹窗会显示）。
+4. 发布后其他人打开应用即收到更新（版本号、更新内容、包大小），一键下载安装。
 
-注意：更新检查访问 `api.github.com`，更新包下载走 GitHub 资产地址（github.com 重定向）。接收方需已装 Python 3.10+；更新时保留用户数据（`.env` / `data` / `config.json`）。
+自定义更新源（可选）：`python run.py set-update-source <URL>`（reset 恢复默认），或设置环境变量 `MB_UPDATE_SOURCE`，适用于自建服务器/国内镜像。
+
+注意：更新检查默认访问 `api.github.com`，更新包下载走 GitHub 资产地址（github.com 重定向）；更新包下载后会做 zip 完整性校验，安装完成后自动清理。接收方需已装 Python 3.10+；更新时保留用户数据（`.env` / `data` / `config.json`）。
 
 ## 配置说明
 

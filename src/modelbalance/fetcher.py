@@ -1,6 +1,7 @@
 """余额聚合查询。"""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from .config import Account
@@ -33,4 +34,8 @@ def fetch_one(account: Account) -> AccountResult:
 
 
 def fetch_all(accounts: list[Account]) -> list[AccountResult]:
-    return [fetch_one(acc) for acc in accounts]
+    """并行查询所有账户余额（单个账户失败不影响其他账户）。"""
+    if not accounts:
+        return []
+    with ThreadPoolExecutor(max_workers=min(8, len(accounts))) as ex:
+        return list(ex.map(fetch_one, accounts))

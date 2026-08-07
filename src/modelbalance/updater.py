@@ -6,12 +6,14 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import urllib.request
+import zipfile
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 
@@ -20,6 +22,35 @@ from .config import PROJECT_ROOT
 GITHUB_OWNER = "taoyiii112-creator"
 GITHUB_REPO = "model-balance"
 RELEASE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+UPDATE_SOURCE_FILE = PROJECT_ROOT / "data" / "update_source.json"
+
+
+def get_update_source() -> str:
+    """当前更新源：优先环境变量 MB_UPDATE_SOURCE，其次 data/update_source.json，最后默认 GitHub。"""
+    url = os.environ.get("MB_UPDATE_SOURCE", "").strip()
+    if url:
+        return url
+    try:
+        if UPDATE_SOURCE_FILE.exists():
+            data = json.loads(UPDATE_SOURCE_FILE.read_text(encoding="utf-8"))
+            url = (data.get("url") or "").strip()
+            if url:
+                return url
+    except (OSError, ValueError):
+        pass
+    return RELEASE_API
+
+
+def set_update_source(url: str) -> None:
+    """设置自定义更新源；传空字符串恢复默认 GitHub Releases。"""
+    url = url.strip()
+    if not url:
+        UPDATE_SOURCE_FILE.unlink(missing_ok=True)
+        return
+    UPDATE_SOURCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    UPDATE_SOURCE_FILE.write_text(
+        json.dumps({"url": url}, ensure_ascii=False), encoding="utf-8"
+    )
 SKIP_ON_APPLY = {".env", "data", "config.json", ".git", "dist", "__pycache__", ".pytest_cache", ".idea", ".vscode"}
 
 
@@ -57,9 +88,9 @@ def parse_release(data: dict) -> dict | None:
     }
 
 
-def fetch_latest_release(owner: str = GITHUB_OWNER, repo: str = GITHUB_REPO, timeout: int = 20) -> dict | None:
-    """获取最新 Release；仓库无 Release 返回 None，网络异常抛出。"""
-    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+def fetch_latest_release(source_url: str | None = None, timeout: int = 20) -> dict | None:
+    """获取最新 Release；无 Release 返回 None，网络异常抛出。"""
+    url = source_url or get_update_source()
     req = urllib.request.Request(
         url,
         headers={"Accept": "application/vnd.github+json", "User-Agent": "model-balance-updater"},
@@ -102,7 +133,28 @@ def download_asset(url: str, dest: Path, progress_cb=None) -> Path:
                 if progress_cb:
                     progress_cb(done, total)
         tmp.replace(dest)
+    validate_zip(dest)
     return dest
+
+
+def validate_zip(path: Path) -> None:
+    """校验更新包是可用的 zip（含 CRC 检查）。"""
+    with zipfile.ZipFile(path) as zf:
+        bad = zf.testzip()
+        if bad is not None:
+            raise ValueError(f"更新包校验失败: {bad}")
+
+
+def cleanup_updates(updates_dir: Path = PROJECT_ROOT / "data" / "updates", keep: Path | None = None) -> None:
+    """清理下载的更新包（默认全部清理，可保留指定文件）。"""
+    if not updates_dir.exists():
+        return
+    for f in updates_dir.iterdir():
+        if f.is_file() and f != keep:
+            try:
+                f.unlink()
+            except OSError:
+                pass
 
 
 def apply_update(zip_path: Path, app_dir: Path = PROJECT_ROOT) -> None:

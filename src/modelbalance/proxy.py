@@ -97,22 +97,22 @@ class ProxyHandler(BaseHTTPRequestHandler):
         )
         try:
             with urlrequest.urlopen(req, timeout=120) as resp:
-                payload = resp.read()
                 status = resp.status
                 ctype = resp.headers.get("Content-Type", "application/json")
+                if "text/event-stream" in ctype:
+                    self._forward_stream(account, body, resp, status, ctype)
+                else:
+                    payload = resp.read()
+                    self._record_if_usage(account, body, payload, ctype)
+                    self._send_bytes(status, ctype, payload)
         except HTTPError as exc:
             payload = exc.read()
             status = exc.code
             ctype = exc.headers.get("Content-Type", "application/json") if exc.headers else "application/json"
+            self._record_if_usage(account, body, payload, ctype)
+            self._send_bytes(status, ctype, payload)
         except URLError as exc:
             self._send_json(502, {"error": f"上游请求失败: {exc}"})
-            return
-        self._record_if_usage(account, body, payload, ctype)
-        self.send_response(status)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
 
     def _read_body(self) -> bytes:
         length = int(self.headers.get("Content-Length") or 0)
@@ -164,6 +164,34 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 note="proxy",
             )
         )
+
+    def _forward_stream(self, account, body, upstream, status: int, ctype: str) -> None:
+        """流式响应：边收边转发给客户端，同时缓冲以解析 usage。"""
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Connection", "close")
+        self.end_headers()
+        buf = b""
+        try:
+            while True:
+                chunk = upstream.read(8192)
+                if not chunk:
+                    break
+                buf += chunk
+                try:
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    break
+        finally:
+            self._record_if_usage(account, body, buf, ctype)
+
+    def _send_bytes(self, status: int, ctype: str, payload: bytes) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
 
     @staticmethod
     def _usage_from_stream(payload: bytes) -> dict | None:

@@ -340,5 +340,123 @@ class TestUpdater(unittest.TestCase):
             self.assertTrue((app_dir / "config.json").exists())
             self.assertTrue((app_dir / "data").is_dir())
 
+class FakeStreamUpstream(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        self.rfile.read(length)
+        chunks = [
+            b'data: {"choices":[{"delta":{"content":"\xe4\xbd\xa0"}}]}\n\n',
+            b'data: {"choices":[{"delta":{"content":"\xe5\xa5\xbd"}}]}\n\n',
+            b'data: {"choices":[{"delta":{}}],"usage":{"prompt_tokens":10,"completion_tokens":4,"prompt_cache_hit_tokens":3,"prompt_cache_miss_tokens":7}}\n\n',
+            b'data: [DONE]\n\n',
+        ]
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Content-Length", str(sum(len(c) for c in chunks)))
+        self.end_headers()
+        for c in chunks:
+            self.wfile.write(c)
+        self.wfile.flush()
+
+    def log_message(self, fmt, *args):
+        pass
+
+
+class TestProxyStreaming(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+        from modelbalance.proxy import ProxyHandler
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name)
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+        os.environ["TEST_API_KEY"] = "sk-test"
+        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), FakeStreamUpstream)
+        threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
+        ProxyHandler.accounts = [
+            Account(
+                name="stream-test",
+                provider="openai_compat",
+                api_key_env="TEST_API_KEY",
+                base_url=f"http://127.0.0.1:{self.upstream.server_port}",
+            )
+        ]
+        self.proxy = ThreadingHTTPServer(("127.0.0.1", 0), ProxyHandler)
+        threading.Thread(target=self.proxy.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        self.proxy.shutdown()
+        self.upstream.shutdown()
+        self.proxy.server_close()
+        self.upstream.server_close()
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_stream_forward_and_record(self):
+        import modelbalance.storage as storage
+
+        req = urlrequest.Request(
+            f"http://127.0.0.1:{self.proxy.server_port}/v1/chat/completions",
+            data=json.dumps(
+                {"model": "deepseek-chat", "stream": True, "messages": [{"role": "user", "content": "hi"}]}
+            ).encode("utf-8"),
+            headers={"Authorization": "Bearer sk-test", "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlrequest.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8")
+        self.assertIn("[DONE]", body)
+        recs = storage.list_usage_records("stream-test")
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]["prompt_cache_hit_tokens"], 3)
+        self.assertEqual(recs[0]["prompt_cache_miss_tokens"], 7)
+        self.assertEqual(recs[0]["completion_tokens"], 4)
+
+
+class TestUpdaterMore(unittest.TestCase):
+    def test_configurable_source(self):
+        import modelbalance.updater as updater
+
+        with tempfile.TemporaryDirectory() as td:
+            updater.UPDATE_SOURCE_FILE = Path(td) / "update_source.json"
+            updater.set_update_source("https://example.com/updates/latest.json")
+            self.assertEqual(updater.get_update_source(), "https://example.com/updates/latest.json")
+            updater.set_update_source("")
+            self.assertEqual(updater.get_update_source(), updater.RELEASE_API)
+        updater.UPDATE_SOURCE_FILE = updater.PROJECT_ROOT / "data" / "update_source.json"
+
+    def test_validate_zip(self):
+        import zipfile
+
+        from modelbalance.updater import validate_zip
+
+        with tempfile.TemporaryDirectory() as td:
+            good = Path(td) / "good.zip"
+            with zipfile.ZipFile(good, "w") as zf:
+                zf.writestr("a.txt", "hi")
+            validate_zip(good)  # 正常不抛异常
+            bad = Path(td) / "bad.zip"
+            bad.write_bytes(b"not a zip at all")
+            with self.assertRaises(Exception):
+                validate_zip(bad)
+
+    def test_cleanup_updates(self):
+        from modelbalance.updater import cleanup_updates
+
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "a.zip").write_bytes(b"x")
+            (d / "b.zip").write_bytes(b"y")
+            cleanup_updates(d, keep=d / "a.zip")
+            self.assertTrue((d / "a.zip").exists())
+            self.assertFalse((d / "b.zip").exists())
+            cleanup_updates(d)
+            self.assertFalse((d / "a.zip").exists())
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,7 @@ from .proxy import ensure_proxy
 from .updater import (
     apply_update,
     check_for_update,
+    cleanup_updates,
     download_asset,
     fmt_size,
     relaunch_app,
@@ -336,8 +337,9 @@ class BalanceApp:
     def _auto_check_update(self):
         try:
             info = check_for_update(__version__)
-        except Exception:  # noqa: BLE001
-            info = None
+        except Exception:  # noqa: BLE001 网络异常不误报"已是最新"
+            self.root.after(0, lambda: self.update_var.set("更新: 检查失败"))
+            return
         if info:
             self.root.after(0, lambda: self._prompt_update(info))
         else:
@@ -422,6 +424,7 @@ class BalanceApp:
         self.update_var.set("更新: 安装中…")
         try:
             apply_update(zip_path)
+            cleanup_updates()
         except Exception as exc:  # noqa: BLE001
             messagebox.showerror("更新失败", f"安装失败: {exc}", parent=self.root)
             self.update_var.set("更新: 安装失败")
