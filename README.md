@@ -74,7 +74,7 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 
 自定义更新源（可选）：`python run.py set-update-source <URL>`（reset 恢复默认），或设置环境变量 `MB_UPDATE_SOURCE`，适用于自建服务器/国内镜像。
 
-注意：更新检查默认访问 `api.github.com`，更新包下载走 GitHub 资产地址（github.com 重定向）；更新包下载后会做 zip 完整性校验，安装完成后自动清理。接收方需已装 Python 3.10+；更新时保留用户数据（`.env` / `data` / `config.json`）。
+注意：更新检查默认访问 `api.github.com`，更新包下载走 GitHub 资产地址（github.com 重定向）；更新包下载后会做 zip 完整性校验，安装完成后自动清理。接收方：zip 源码版需 Python 3.10+，exe 版免 Python（见下方打包章节）；更新时保留用户数据（`.env` / `data` / `config.json`）。
 
 ## 配置说明
 

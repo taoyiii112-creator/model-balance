@@ -10,32 +10,25 @@
 
 # 当前状态
 
-- 2026-08-07：手机端更新源可配置（设置→更新源地址）+ 检查失败显示具体原因（v0.2.2）；更新功能此前已具备，但 model_balance_app 仓库从未发布 Release 导致手机端收不到更新。
-- 2026-08-07：exe 打包完成（v0.2.2）——PyInstaller 单文件 exe（dist/model-balance.exe，约 12MB），免 Python 分发；冻结模式数据目录在 exe 旁；exe 版更新走 exe 资产 + cmd 辅助脚本自替换；logutil 修复（handler 挂 root）。
-- 2026-08-07：余额趋势图与低余额提醒（v0.2.2）——快照默认自动保存（30 分钟限频）；更新改为暂存后退出再应用（apply_staged.py）；代理增加健康检查与端口占用校验；新增 data/logs/app.log 日志；补充 web/CLI/快照测试（28 项全过）。
-- 2026-08-07：健壮性优化（v0.2.1）——流式代理边收边转发、SQLite busy_timeout、多账户并行查询、更新源可配置（set-update-source / MB_UPDATE_SOURCE）、更新包 zip 校验与自动清理、自动检查失败不误报。
-- 2026-08-07：桌面版自动更新完成（updater.py）——启动/手动检查 GitHub Releases，弹窗显示版本/更新内容/包大小，一键下载安装并重启；打包脚本 make_release.py + 打包更新包.bat。
-- 2026-08-07：用量代理自动拉起——桌面应用 / 网页版启动时自动检查并后台启动代理（ensure_proxy），无需手动运行。
-- 2026-08-07：本地 API 代理自动采集完成（proxy 命令）——客户端 base_url 指向代理即自动记录真实用量；pricing 可选估算费用。
-- 2026-08-07：用量图表完成——桌面与网页版均支持"按天消费金额/Token 柱状图"与"输入(命中缓存)/输入(未命中缓存)/输出 扇形图"；数据模型新增缓存命中拆分字段（旧库自动迁移）；CLI add-usage 支持 --cache-hit/--cache-miss。
-- 2026-08-07：手机 App APK 打包成功（app-release.apk 48.7MB，Android SDK 36.1.0 + 腾讯/阿里云构建镜像），待实机安装验证。
-- 2026-08-07：手机 App 工程化完成——Flutter 3.44.8 已装（中国镜像）、android/ios 平台工程已生成、flutter analyze 零问题、7 个测试通过。
-- 2026-08-06：桌面应用完成并通过真实数据验证（DeepSeek 余额实时显示）。入口：双击 启动仪表盘.bat 或 python run.py app。
-- 2026-08-06：DeepSeek 真实余额验证通过；代码已上传 GitHub（https://github.com/taoyiii112-creator/model-balance）。
+- 2026-08-07：桌面端 v0.2.2 已发布 GitHub Release（zip + exe 双资产），包含：余额趋势图、低余额提醒、exe 打包、日志 / 健康检查、更新暂存机制、冻结模式路径修复、退出时优雅关闭代理。
+- 2026-08-07：exe 打包完成（dist/model-balance.exe 约 12MB，免 Python 分发；冻结模式数据目录指向真实项目根）。
+- 2026-08-07：余额趋势图与低余额提醒（快照默认自动保存）；更新改为"暂存 → 退出 → 安装 → 重启"；代理健康检查与端口占用校验；data/logs/app.log 日志。
+- 2026-08-07：健壮性优化（v0.2.1）与桌面版自动更新（v0.2.0 起）。
+- 2026-08-07：手机端最新 v0.2.6 已发布（正式签名 APK + SHA256 校验），flutter test 25 项通过；更新源可配置、用量图表与余额趋势图均完成。
+- 2026-08-06：桌面应用完成并通过真实数据验证（DeepSeek 余额实时显示）；代码已上传 GitHub。
 - 2026-08-05：项目初始化完成；项目按要求迁移至 D:\codexproject\模型余额。
 
 # 技术方案
 
 - 语言/依赖：Python 3.10+，纯标准库（urllib / sqlite3 / argparse / http.server / tkinter），无第三方依赖。
 - 架构：多提供商适配器模式（providers/ 下按提供商实现 fetch_balance），账户清单在 config.json，密钥放 .env。
-- 存储：SQLite（data/balance.db），usage_records 含 prompt_cache_hit_tokens / prompt_cache_miss_tokens（旧库自动 ALTER 迁移）；balance_snapshots 存余额快照。
-- 聚合：storage.usage_daily（按天消费/Token，零值补齐）与 storage.usage_breakdown（缓存命中/未命中/输出）。
-- 自动采集：proxy.py 本地 OpenAI 兼容代理——按 Authorization 匹配账户、转发上游、解析 usage（兼容 DeepSeek/OpenAI 风格，含流式）、按 pricing 估算费用后入库；ensure_proxy 随桌面/网页启动自动拉起。
-- 图表：桌面应用用 Tkinter Canvas 绘制柱状图与扇形图；网页版用 Canvas JS 绘制（无第三方图表库）。
-- 展示层（主）：桌面应用 app.py（Tkinter），余额表 + 用量表 + 图表 + 自动刷新。
-- 展示层（可选）：web 命令本地仪表盘。
-- 入口：run.py / python -m modelbalance；Windows 双击 启动仪表盘.bat。
-- 更新：updater.py 从 GitHub Releases 拉取最新版本（api.github.com），下载 zip 更新包、解压覆盖（保留 .env / data / config.json），完成后自动重启。
+- 存储：SQLite（data/balance.db），usage_records 含 prompt_cache_hit_tokens / prompt_cache_miss_tokens；balance_snapshots 存余额快照。
+- 聚合：storage.usage_daily（按天消费/Token）与 storage.usage_breakdown（缓存命中/未命中/输出）、snapshot_history（趋势）。
+- 自动采集：proxy.py 本地 OpenAI 兼容代理——按 Authorization 匹配账户、转发上游、解析 usage（兼容 DeepSeek/OpenAI 风格，含流式边收边转发）、按 pricing 估算费用后入库；ensure_proxy 随桌面/网页启动自动拉起，退出时优雅关闭自拉起的子进程。
+- 图表：桌面应用用 Tkinter Canvas（柱状图、扇形图、余额趋势折线图，柱状图支持悬停提示）；网页版用 Canvas JS。
+- 展示层（主）：桌面应用 app.py（Tkinter）；可选 web 本地仪表盘。
+- 入口：run.py / python -m modelbalance；Windows 双击 启动仪表盘.bat；分发用 dist/model-balance.exe（免 Python）。
+- 更新：updater.py 从 GitHub Releases 拉取最新版本；源码版走 zip 暂存 + apply_staged.py 应用；exe 版下载 exe 资产 + cmd 辅助脚本自替换；均保留 .env / data / config.json；支持自定义更新源（set-update-source / MB_UPDATE_SOURCE）。
 - 实时性：桌面应用定时刷新（默认 30 秒，可调）+ watch 命令行轮询。
 
 # 开发规范
@@ -46,6 +39,7 @@
 - 敏感信息（API Key、Token）一律放 .env，永不提交到 Git。
 - 一个提交只做一件事。
 - 所有正式项目必须位于 D:\codexproject 下（项目工作流技能强制规则）。
+- 版本发布必须经用户明确授权（见 gh-release-publish 技能与 AGENTS.md）。
 
 # 已知问题
 
@@ -53,12 +47,12 @@
 - 中转渠道尚未配置真实地址与 Key（config.json 中 base_url 为示例域名）。
 - OpenAI credit_grants 接口对部分 API Key 不稳定，待真实 Key 验证。
 - 各提供商余额接口不统一：Anthropic / Gemini / 通义 / Kimi 无公开余额接口。
-- 手机 App 表结构尚未同步缓存命中字段与图表（待办）。
+- 桌面端与手机端数据暂不互通（各自本地 SQLite），多端同步未做。
 
 # 下一步计划
 
-1. 手机 App 同步缓存命中字段与用量图表。
-2. 接入中转渠道：用户提供真实 base_url 并填 RELAY_API_KEY 后验证。
-3. 可选：OpenAI 官方 Key 验证。
-4. 为各账户配置 pricing 单价，让代理自动估算费用。
-5. 余额趋势图与低余额告警。
+1. 接入中转渠道：用户提供真实 base_url 并填 RELAY_API_KEY 后验证。
+2. 可选：OpenAI 官方 Key 验证。
+3. 为各账户配置 pricing 单价，让代理自动估算费用。
+4. 多端数据同步（桌面 / 手机共用后端，需设计后端 API）。
+5. 分发优化：若 exe 版仍有中文路径临时目录清理弹窗，提供一键启动器（ASCII TMP）。

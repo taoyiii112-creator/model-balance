@@ -1,5 +1,12 @@
 ## 日期：2026-08-07
 
+完成：桌面端 v0.2.2 发布 GitHub Release（经 gh-release-publish 技能，含 zip 源码包 + model-balance.exe 双资产）；整理项目文档，清除过时内容（手机端旧状态、已完成的待办项等）。
+
+影响：分发闭环（exe 免 Python）与更新链路完整可用；文档与当前状态一致。
+
+备注：中转渠道、OpenAI 官方、pricing 配置、多端同步为后续待办。
+## 日期：2026-08-07
+
 完成：exe 打包（v0.2.2）——PyInstaller 单文件 exe（dist/model-balance.exe 约 12MB），`--paths src` + 隐藏导入解决打包找不到 modelbalance 的问题；双击无参数默认打开应用界面；冻结模式 PROJECT_ROOT 指向 exe 目录（数据/配置持久化）；exe 版更新支持下载 exe 资产并自动替换重启（cmd 辅助脚本）；logutil 修复（handler 挂 root，所有模块日志统一写入）。
 
 影响：分发闭环完成——接收方免装 Python，双击即用；exe 与源码版更新机制并存。28 项测试全过。
