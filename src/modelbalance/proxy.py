@@ -7,12 +7,17 @@ API Key 保持原样（必须是 config.json 已配置账户的 Key）。
 from __future__ import annotations
 
 import json
+import os
+import socket
+import subprocess
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 
-from .config import load_accounts, load_env
+from .config import PROJECT_ROOT, load_accounts, load_env
 from .models import UsageRecord
 from .storage import add_usage_record
 
@@ -189,6 +194,36 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         pass
+
+
+def proxy_is_running(port: int = 8001) -> bool:
+    """检测本机端口是否已有代理在监听。"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.3)
+        try:
+            return s.connect_ex(("127.0.0.1", port)) == 0
+        except OSError:
+            return False
+
+
+def ensure_proxy(port: int = 8001, quiet: bool = False) -> bool:
+    """确保用量代理在运行；未运行则后台自动拉起（无窗口）。"""
+    if proxy_is_running(port):
+        if not quiet:
+            print(f"用量代理已在运行: http://127.0.0.1:{port}")
+        return True
+    exe = Path(sys.executable)
+    pyw = exe.with_name("pythonw.exe")
+    target = pyw if pyw.exists() else exe
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    subprocess.Popen(
+        [str(target), str(PROJECT_ROOT / "run.py"), "proxy", "--port", str(port)],
+        cwd=str(PROJECT_ROOT),
+        creationflags=flags,
+    )
+    if not quiet:
+        print(f"已自动启动用量代理: http://127.0.0.1:{port}")
+    return True
 
 
 def run_proxy(host: str = "127.0.0.1", port: int = 8001) -> int:

@@ -278,5 +278,11 @@ class TestProxyIntegration(unittest.TestCase):
         self.assertEqual(recs[0]["prompt_cache_miss_tokens"], 100)
         self.assertEqual(recs[0]["completion_tokens"], 50)
 
+    def test_proxy_is_running(self):
+        from modelbalance.proxy import proxy_is_running
+
+        self.assertTrue(proxy_is_running(self.proxy.server_port))
+        self.assertFalse(proxy_is_running(59999))
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,7 @@ from .storage import (
     usage_daily,
     usage_totals,
 )
+from .proxy import ensure_proxy
 
 BG = "#0f172a"
 GRID = "#475569"
@@ -64,6 +65,8 @@ class BalanceApp:
         ttk.Checkbutton(bar, text="保存余额快照", variable=self.save_var).pack(side="left", padx=12)
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(bar, textvariable=self.status_var).pack(side="right")
+        self.proxy_var = tk.StringVar(value="用量代理: 检查中…")
+        ttk.Label(bar, textvariable=self.proxy_var).pack(side="right", padx=(0, 12))
 
         # 余额表
         ttk.Label(root, text="账户余额（实时查询）", padding=(8, 4)).pack(anchor="w")
@@ -121,6 +124,12 @@ class BalanceApp:
         ttk.Label(self.pie_frame, text="Token 构成（近 30 天）", padding=(4, 2)).pack(anchor="w")
         self.pie_canvas = tk.Canvas(self.pie_frame, width=320, height=230, bg=BG, highlightthickness=0)
         self.pie_canvas.pack(fill="both", expand=True)
+
+        # 用量代理自动拉起（无需手动启动）
+        if ensure_proxy(port=8001, quiet=True):
+            self.proxy_var.set("用量代理: 运行中")
+        else:
+            self.proxy_var.set("用量代理: 未运行")
 
         self.root.after(200, self._poll_queue)
         self.refresh_now()

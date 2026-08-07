@@ -10,6 +10,8 @@
 
 # 当前状态
 
+- 2026-08-07：用量代理自动拉起——桌面应用 / 网页版启动时自动检查并后台启动代理（ensure_proxy），无需手动运行。
+- 2026-08-07：本地 API 代理自动采集完成（proxy 命令）——客户端 base_url 指向代理即自动记录真实用量；pricing 可选估算费用。
 - 2026-08-07：用量图表完成——桌面与网页版均支持"按天消费金额/Token 柱状图"与"输入(命中缓存)/输入(未命中缓存)/输出 扇形图"；数据模型新增缓存命中拆分字段（旧库自动迁移）；CLI add-usage 支持 --cache-hit/--cache-miss。
 - 2026-08-07：手机 App APK 打包成功（app-release.apk 48.7MB，Android SDK 36.1.0 + 腾讯/阿里云构建镜像），待实机安装验证。
 - 2026-08-07：手机 App 工程化完成——Flutter 3.44.8 已装（中国镜像）、android/ios 平台工程已生成、flutter analyze 零问题、7 个测试通过。
@@ -23,6 +25,7 @@
 - 架构：多提供商适配器模式（providers/ 下按提供商实现 fetch_balance），账户清单在 config.json，密钥放 .env。
 - 存储：SQLite（data/balance.db），usage_records 含 prompt_cache_hit_tokens / prompt_cache_miss_tokens（旧库自动 ALTER 迁移）；balance_snapshots 存余额快照。
 - 聚合：storage.usage_daily（按天消费/Token，零值补齐）与 storage.usage_breakdown（缓存命中/未命中/输出）。
+- 自动采集：proxy.py 本地 OpenAI 兼容代理——按 Authorization 匹配账户、转发上游、解析 usage（兼容 DeepSeek/OpenAI 风格，含流式）、按 pricing 估算费用后入库；ensure_proxy 随桌面/网页启动自动拉起。
 - 图表：桌面应用用 Tkinter Canvas 绘制柱状图与扇形图；网页版用 Canvas JS 绘制（无第三方图表库）。
 - 展示层（主）：桌面应用 app.py（Tkinter），余额表 + 用量表 + 图表 + 自动刷新。
 - 展示层（可选）：web 命令本地仪表盘。

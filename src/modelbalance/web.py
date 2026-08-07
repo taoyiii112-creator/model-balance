@@ -19,6 +19,7 @@ from .storage import (
     usage_daily,
     usage_totals,
 )
+from .proxy import ensure_proxy
 
 PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh">
@@ -264,6 +265,7 @@ class Handler(BaseHTTPRequestHandler):
 def serve(host: str = "127.0.0.1", port: int = 8000, interval: int = 30, save: bool = False) -> int:
     Handler.interval = interval
     Handler.save_snapshots = save
+    ensure_proxy(port=8001)
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"仪表盘已启动: http://{host}:{port}（每 {interval} 秒自动刷新，Ctrl+C 退出）")
     try:

@@ -33,7 +33,7 @@ Windows 桌面应用，实时获取模型 API 账户余额与用量：
 ## 快速开始
 
 1. 双击 `启动仪表盘.bat`，或命令行运行 `python run.py app`。
-2. 应用窗口打开后自动查询余额并每 30 秒刷新（可在窗口里改间隔）；下方图表展示每日消费/Token 与输入输出构成。
+2. 应用窗口打开后自动查询余额并每 30 秒刷新；**用量代理会自动拉起**（无需手动启动），客户端指向 http://127.0.0.1:8001/v1 即可自动记录用量。
 3. 首次使用请先配置：复制 `.env.example` 为 `.env`（项目已生成 .env 模板）填入 API Key，再按需编辑 `config.json`。
 
 CLI 其他命令：
@@ -53,7 +53,7 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 
 把客户端的 base_url 指向本机代理，所有请求自动记录真实用量（输入 / 输出 / 缓存命中）：
 
-1. 启动代理：双击 `启动用量代理.bat`，或运行 `python run.py proxy`（默认 http://127.0.0.1:8001）。
+1. 启动代理：双击 `启动用量代理.bat`，或运行 `python run.py proxy`（默认 http://127.0.0.1:8001）。**桌面应用 / 网页版启动时会自动拉起代理，通常无需手动启动。**
 2. 客户端配置：base_url 改为 `http://127.0.0.1:8001/v1`，API Key 保持原样（必须是 config.json 已配置账户的 Key）。
 3. 每次请求自动写入本地数据库，图表实时更新（note 标记为 proxy）。
 
