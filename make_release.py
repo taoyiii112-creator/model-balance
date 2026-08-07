@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-EXCLUDE = {".git", ".env", "data", "dist", "__pycache__", ".pytest_cache", ".idea", ".vscode"}
+EXCLUDE = {".git", ".env", "data", "dist", "build", "__pycache__", ".pytest_cache", ".idea", ".vscode"}
 
 
 def read_version() -> str:

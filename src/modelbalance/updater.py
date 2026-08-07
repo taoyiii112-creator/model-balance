@@ -75,9 +75,15 @@ def fmt_size(num_bytes: int) -> str:
     return f"{num_bytes / 1024:.0f} KB"
 
 
-def parse_release(data: dict) -> dict | None:
-    """从 GitHub Releases API 响应中提取更新信息（zip 资产）。"""
-    asset = next((a for a in data.get("assets", []) if a.get("name", "").endswith(".zip")), None)
+def asset_suffix() -> str:
+    """更新包资产后缀：exe 打包版用 .exe，源码版用 .zip。"""
+    return ".exe" if getattr(sys, "frozen", False) else ".zip"
+
+
+def parse_release(data: dict, suffix: str | None = None) -> dict | None:
+    """从 GitHub Releases API 响应中提取更新信息（zip 或 exe 资产）。"""
+    suffix = suffix or asset_suffix()
+    asset = next((a for a in data.get("assets", []) if a.get("name", "").lower().endswith(suffix)), None)
     if not data.get("tag_name") or not asset:
         return None
     return {

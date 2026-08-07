@@ -1,16 +1,5 @@
 # 模型余额获取
 
-## 手机 App（Flutter）
-
-手机端项目位于 `D:\codexProject\model_balance_app`（独立目录，纯英文路径以兼容 Android 构建工具）：
-
-- 实时查询 DeepSeek / OpenAI / 中转渠道余额，默认 30 秒自动刷新
-- 手机端 Token 用量记录（SQLite）与余额快照，表结构与桌面版一致
-- API Key 保存在手机系统安全存储（Keystore / Keychain），不写明文
-- 支持 Android / iOS；详见该目录下 README.md
-
-注：桌面版已新增缓存命中字段与用量图表，手机端表结构待同步（见父项目 todo）。
-
 ## 项目介绍
 
 Windows 桌面应用，实时获取模型 API 账户余额与用量：
@@ -117,7 +106,26 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 | 中转渠道（one-api 等） | 有（user/status） | 已接入，待配置真实地址验证 |
 | Anthropic / Gemini / 通义千问 / Kimi | 无公开余额接口 | 无法查余额，Token 用量走本地记录 |
 
+## 打包为 exe（免 Python 分发）
+
+双击 `打包exe.bat`（或运行 `python build_exe.py`）生成 `dist/model-balance.exe`（单文件，约 12MB，接收方免装 Python）。
+
+- 分发：把 exe 发给对方即可；首次使用需在 exe 同目录放 `.env`（API Key）与 `config.json`（账户），`data/` 目录会自动建在 exe 旁边。
+- exe 版更新：检查到新版本时下载 exe 资产，应用退出后自动替换并重启（无需 Python，通过 cmd 辅助脚本完成）。
+- 源码版更新仍走 zip + apply_staged.py（需要 Python 3.10+）。
+
 ## 环境要求
 
 - Python 3.10+（Windows 自带 Tkinter；项目已内置运行时可用）
 - Windows / macOS / Linux 均可（桌面应用面向 Windows）
+
+## 相关项目（备注）
+
+本仓库是桌面端「模型余额获取」。同一应用的手机端（Flutter）为独立子项目，位于 `D:\codexProject\model_balance_app`（纯英文路径以兼容 Android 构建工具）：
+
+- 实时查询 DeepSeek / OpenAI / 中转渠道余额，默认 30 秒自动刷新
+- 手机端 Token 用量记录（SQLite）与余额快照，表结构与桌面版一致（含缓存命中字段拆分）
+- API Key 保存在手机系统安全存储（Keystore / Keychain），不写明文
+- 支持 Android / iOS；详细文档见该子项目 README.md
+
+手机端开发进度文档（memory / todo / summary）由本仓库统一维护。

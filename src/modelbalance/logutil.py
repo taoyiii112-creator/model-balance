@@ -22,6 +22,8 @@ def get_logger(name: str = "modelbalance") -> logging.Logger:
         handler.setFormatter(
             logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         )
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        # 挂到 root：所有模块的 logger 都会写入同一个文件
+        root = logging.getLogger()
+        root.addHandler(handler)
+        root.setLevel(logging.INFO)
     return logger

@@ -264,15 +264,22 @@ def ensure_proxy(port: int = 8001, quiet: bool = False) -> bool:
             print(f"端口 {port} 被其他程序占用，未启动用量代理")
         logger.warning("端口 %s 被其他程序占用，未启动用量代理", port)
         return False
-    exe = Path(sys.executable)
-    pyw = exe.with_name("pythonw.exe")
-    target = pyw if pyw.exists() else exe
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    subprocess.Popen(
-        [str(target), str(PROJECT_ROOT / "run.py"), "proxy", "--port", str(port)],
-        cwd=str(PROJECT_ROOT),
-        creationflags=flags,
-    )
+    if getattr(sys, "frozen", False):
+        subprocess.Popen(
+            [str(Path(sys.executable)), "--proxy"],
+            cwd=str(PROJECT_ROOT),
+            creationflags=flags,
+        )
+    else:
+        exe = Path(sys.executable)
+        pyw = exe.with_name("pythonw.exe")
+        target = pyw if pyw.exists() else exe
+        subprocess.Popen(
+            [str(target), str(PROJECT_ROOT / "run.py"), "proxy", "--port", str(port)],
+            cwd=str(PROJECT_ROOT),
+            creationflags=flags,
+        )
     if not quiet:
         print(f"已自动启动用量代理: http://127.0.0.1:{port}")
     return True

@@ -163,6 +163,7 @@ class BalanceApp:
             self.proxy_var.set("用量代理: 未运行（端口被占用）")
         threading.Thread(target=self._auto_check_update, daemon=True).start()
 
+        logger.info("BalanceApp.__init__: 初始化完成，进入定时器")
         self.root.after(200, self._poll_queue)
         self.refresh_now()
 
@@ -495,16 +496,24 @@ class BalanceApp:
             pass
         self.root.after(100, self._poll_download)
 
-    def _apply_and_restart(self, zip_path):
+    def _apply_and_restart(self, asset_path):
         self.update_var.set("更新: 准备安装…")
         try:
-            stage_update(zip_path)
-            cleanup_updates()
+            if getattr(sys, "frozen", False):
+                self._apply_exe_update(Path(asset_path))
+            else:
+                stage_update(Path(asset_path))
+                cleanup_updates()
+                self._spawn_dev_updater()
         except Exception as exc:  # noqa: BLE001
             logger.error("准备更新失败: %s", exc)
             messagebox.showerror("更新失败", f"准备更新失败: {exc}", parent=self.root)
             self.update_var.set("更新: 准备失败")
             return
+        messagebox.showinfo("更新", "更新已准备好，应用即将重启完成安装。", parent=self.root)
+        self.root.destroy()
+
+    def _spawn_dev_updater(self):
         exe = Path(sys.executable)
         pyw = exe.with_name("pythonw.exe")
         target = pyw if pyw.exists() else exe
@@ -514,13 +523,43 @@ class BalanceApp:
             cwd=str(PROJECT_ROOT),
             creationflags=flags,
         )
-        messagebox.showinfo("更新", "更新已准备好，应用即将重启完成安装。", parent=self.root)
-        self.root.destroy()
+
+    def _apply_exe_update(self, new_exe: Path):
+        """冻结（exe）模式：生成 cmd 辅助脚本，等待本进程退出后替换 exe 并重启。"""
+        target_exe = Path(sys.executable)
+        bat = PROJECT_ROOT / "data" / "update_apply.bat"
+        bat.parent.mkdir(parents=True, exist_ok=True)
+        bat.write_text(
+            "@echo off\r\n"
+            'set "MB_NEW=%MB_NEW_EXE%"\r\n'
+            'set "MB_TGT=%MB_TARGET_EXE%"\r\n'
+            'set "MB_PID=%MB_APP_PID%"\r\n'
+            ":loop\r\n"
+            'tasklist /FI "PID eq %MB_PID%" | find "%MB_PID%" >nul\r\n'
+            "if %errorlevel%==0 (timeout /t 1 /nobreak >nul & goto loop)\r\n"
+            'move /y "%MB_NEW%" "%MB_TGT%"\r\n'
+            'start "" "%MB_TGT%"\r\n'
+            'del "%~f0"\r\n',
+            encoding="utf-8",
+        )
+        env = dict(os.environ)
+        env["MB_NEW_EXE"] = str(new_exe)
+        env["MB_TARGET_EXE"] = str(target_exe)
+        env["MB_APP_PID"] = str(os.getpid())
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        subprocess.Popen(
+            ["cmd.exe", "/c", str(bat)],
+            env=env, cwd=str(PROJECT_ROOT), creationflags=flags,
+        )
 
 
 def run_app(interval: int = 30, save: bool = True) -> int:
     load_env()
+    logger.info("run_app: 准备创建 Tk 窗口")
     root = tk.Tk()
+    logger.info("run_app: Tk 窗口已创建")
     BalanceApp(root, interval=interval, save=save)
+    logger.info("run_app: BalanceApp 初始化完成")
     root.mainloop()
+    logger.info("run_app: 主循环退出")
     return 0

@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timedelta
 
 from .config import load_accounts, load_env
+from .logutil import get_logger
 from .fetcher import fetch_all
 from .models import UsageRecord
 from .storage import add_snapshot, add_usage_record, init_db, list_usage_records, usage_breakdown, usage_totals
@@ -216,16 +217,31 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+logger = get_logger("cli")
+
+
 def main(argv: list[str] | None = None) -> int:
+    logger.info("cli.main 开始，argv=%s", argv)
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
+    args_list = sys.argv[1:] if argv is None else argv
+    if not args_list:
+        # 双击 exe 无参数时默认打开桌面应用
+        args_list = ["app"]
+    if args_list == ["--proxy"]:
+        from .proxy import run_proxy
+
+        return run_proxy(host="127.0.0.1", port=8001)
     load_env()
+    logger.info("load_env 完成")
     init_db()
+    logger.info("init_db 完成")
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(args_list)
+    logger.info("解析完成，command=%s", args.command)
     return args.func(args)
 
 
