@@ -42,7 +42,6 @@
 - 子项目（如手机 App `D:\codexProject\model_balance_app`）不重复建四件套：仅保留 README.md，进度文档由父项目统一维护。
 - Git 提交信息用中文，遵循 feat: / fix: / refactor: / docs: / chore: / test: 前缀。
 - 敏感信息（API Key、Token）一律放 .env，永不提交到 Git。
-- 版本发布铁律：任何 GitHub Release / 应用更新推送，必须先获得用户明确授权；无论间隔多久或新开对话，未经授权一律不发布、不打包发布、不推送更新。
 - 一个提交只做一件事。
 - 所有正式项目必须位于 D:\codexproject 下（项目工作流技能强制规则）。
 
