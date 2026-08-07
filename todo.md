@@ -6,14 +6,14 @@
 
 # 待完成
 
+- 手机 App 同步缓存命中字段与用量图表
 - Token 用量自动采集（代理层或渠道用量接口）
 - 余额趋势图与低余额告警
 - 打包为独立 exe（可选）
-- 手机 App 打包 APK 并实机验证
 
 # 完成
 
-- 2026-08-07 手机 App 用量可视化：每日柱状图（金额/Token）+ Token 构成扇形图（输入命中/未命中缓存、输出）
+- 2026-08-07 用量图表：桌面与网页版按天消费/Token 柱状图 + 输入输出构成扇形图；数据模型缓存命中拆分（旧库自动迁移）
 - 2026-08-07 手机 App APK 打包成功：安装 Android SDK 36.1.0，构建源切换为腾讯/阿里云镜像，flutter build apk 产出 app-release.apk（48.7MB）
 - 2026-08-07 手机 App 工程化：Flutter SDK 3.44.8 安装（中国镜像）、生成 android/ios 平台工程、flutter analyze 零问题、7 个测试通过
 - 2026-08-06 手机 App 项目创建：Flutter 骨架 + 余额查询（DeepSeek / OpenAI / 中转渠道）+ Token 用量记录 + API Key 安全存储 + 账户管理

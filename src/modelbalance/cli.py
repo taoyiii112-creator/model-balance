@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from .config import load_accounts, load_env
 from .fetcher import fetch_all
 from .models import UsageRecord
-from .storage import add_snapshot, add_usage_record, init_db, list_usage_records, usage_totals
+from .storage import add_snapshot, add_usage_record, init_db, list_usage_records, usage_breakdown, usage_totals
 from .web import serve
 
 
@@ -65,6 +65,10 @@ def cmd_usage(args) -> int:
         f"总 Token: {totals['total_tokens']}   "
         f"费用: {totals['cost']:.4f}"
     )
+    bd = usage_breakdown(args.account, since)
+    print(
+        f"  输入(命中缓存): {bd['cache_hit']} | 输入(未命中缓存): {bd['cache_miss']} | 输出: {bd['output']}"
+    )
     for rec in records:
         print(
             f"{rec['created_at']}  {rec['account']:<16}{rec['model']:<20}"
@@ -75,11 +79,15 @@ def cmd_usage(args) -> int:
 
 
 def cmd_add_usage(args) -> int:
+    hit, miss = args.cache_hit, args.cache_miss
+    prompt = args.prompt or (hit + miss)
     rec = UsageRecord(
         account=args.account,
         model=args.model,
-        prompt_tokens=args.prompt,
+        prompt_tokens=prompt,
         completion_tokens=args.completion,
+        prompt_cache_hit_tokens=hit,
+        prompt_cache_miss_tokens=miss,
         cost=args.cost,
         note=args.note or "",
     )
@@ -145,6 +153,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("--account", required=True)
     p_add.add_argument("--model", required=True)
     p_add.add_argument("--prompt", type=int, default=0)
+    p_add.add_argument("--cache-hit", type=int, default=0, help="输入命中缓存的 Token")
+    p_add.add_argument("--cache-miss", type=int, default=0, help="输入未命中缓存的 Token")
     p_add.add_argument("--completion", type=int, default=0)
     p_add.add_argument("--cost", type=float)
     p_add.add_argument("--note")

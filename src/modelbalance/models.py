@@ -29,6 +29,8 @@ class UsageRecord:
     model: str
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    prompt_cache_hit_tokens: int = 0      # 输入（命中缓存）
+    prompt_cache_miss_tokens: int = 0     # 输入（未命中缓存）
     cost: float | None = None
     note: str = ""
     created_at: datetime = field(default_factory=datetime.now)

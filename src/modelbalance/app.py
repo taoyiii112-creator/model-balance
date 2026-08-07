@@ -9,11 +9,30 @@ from tkinter import ttk
 
 from .config import load_accounts, load_env
 from .fetcher import fetch_all
-from .storage import add_snapshot, list_usage_records, usage_totals
+from .storage import (
+    add_snapshot,
+    list_usage_records,
+    usage_breakdown,
+    usage_daily,
+    usage_totals,
+)
+
+BG = "#1e293b"
+GRID = "#334155"
+TEXT = "#e2e8f0"
+BAR_COLOR_COST = "#f59e0b"
+BAR_COLOR_TOKEN = "#38bdf8"
+PIE_COLORS = {"cache_hit": "#22c55e", "cache_miss": "#3b82f6", "output": "#f97316"}
 
 
 def fmt_money(value) -> str:
     return "-" if value is None else f"{value:.4f}"
+
+
+def _canvas_size(canvas, fallback_w: int, fallback_h: int) -> tuple[int, int]:
+    w = canvas.winfo_width()
+    h = canvas.winfo_height()
+    return (w if w > 50 else fallback_w, h if h > 50 else fallback_h)
 
 
 class BalanceApp:
@@ -26,8 +45,8 @@ class BalanceApp:
         self._auto_scheduled = False
 
         root.title("模型余额仪表盘")
-        root.geometry("880x640")
-        root.minsize(720, 520)
+        root.geometry("1220x920")
+        root.minsize(1000, 780)
 
         # 顶部控制栏
         bar = ttk.Frame(root, padding=8)
@@ -44,7 +63,7 @@ class BalanceApp:
         # 余额表
         ttk.Label(root, text="账户余额（实时查询）", padding=(8, 4)).pack(anchor="w")
         bal_cols = ("account", "provider", "currency", "available", "used", "total", "status")
-        self.bal_tree = ttk.Treeview(root, columns=bal_cols, show="headings", height=8)
+        self.bal_tree = ttk.Treeview(root, columns=bal_cols, show="headings", height=6)
         bal_head = {
             "account": "账户", "provider": "提供商", "currency": "币种",
             "available": "可用金额", "used": "已用金额", "total": "总额", "status": "状态",
@@ -59,16 +78,38 @@ class BalanceApp:
         self.bal_tree.pack(fill="x", padx=8)
 
         # 用量区
-        ttk.Label(root, text="Token 用量（近 30 天）", padding=(8, 8)).pack(anchor="w")
+        ttk.Label(root, text="Token 用量记录（近 30 天）", padding=(8, 6)).pack(anchor="w")
         self.usage_summary_var = tk.StringVar(value="-")
         ttk.Label(root, textvariable=self.usage_summary_var, padding=(8, 0)).pack(anchor="w")
         use_cols = ("time", "account", "model", "tokens", "cost")
-        self.usage_tree = ttk.Treeview(root, columns=use_cols, show="headings", height=8)
+        self.usage_tree = ttk.Treeview(root, columns=use_cols, show="headings", height=5)
         use_head = {"time": "时间", "account": "账户", "model": "模型", "tokens": "Token", "cost": "费用"}
         for c in use_cols:
             self.usage_tree.heading(c, text=use_head[c])
             self.usage_tree.column(c, width=170 if c in ("time", "model") else 110, anchor="center")
-        self.usage_tree.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self.usage_tree.pack(fill="x", padx=8)
+
+        # 图表区
+        charts = ttk.Frame(root)
+        charts.pack(fill="both", expand=True, padx=8, pady=(8, 8))
+
+        self.cost_frame = ttk.Frame(charts)
+        self.cost_frame.pack(side="left", fill="both", expand=True)
+        ttk.Label(self.cost_frame, text="每日消费金额（近 14 天）", padding=(4, 2)).pack(anchor="w")
+        self.cost_canvas = tk.Canvas(self.cost_frame, width=420, height=220, bg=BG, highlightthickness=0)
+        self.cost_canvas.pack(fill="both", expand=True)
+
+        self.token_frame = ttk.Frame(charts)
+        self.token_frame.pack(side="left", fill="both", expand=True)
+        ttk.Label(self.token_frame, text="每日 Token 用量（近 14 天）", padding=(4, 2)).pack(anchor="w")
+        self.token_canvas = tk.Canvas(self.token_frame, width=420, height=220, bg=BG, highlightthickness=0)
+        self.token_canvas.pack(fill="both", expand=True)
+
+        self.pie_frame = ttk.Frame(charts)
+        self.pie_frame.pack(side="left", fill="both", expand=True)
+        ttk.Label(self.pie_frame, text="Token 构成（近 30 天）", padding=(4, 2)).pack(anchor="w")
+        self.pie_canvas = tk.Canvas(self.pie_frame, width=300, height=220, bg=BG, highlightthickness=0)
+        self.pie_canvas.pack(fill="both", expand=True)
 
         self.root.after(200, self._poll_queue)
         self.refresh_now()
@@ -134,13 +175,81 @@ class BalanceApp:
             self.usage_tree.delete(item)
         totals = usage_totals(since=since)
         self.usage_summary_var.set(
-            f"共 {totals['records']} 条记录 / {totals['total_tokens']} tokens / 费用 {totals['cost']:.4f}"
+            f"共 {totals['records']} 条记录 / {totals['total_tokens']} tokens / "
+            f"费用 {totals['cost']:.4f}"
         )
         for rec in list_usage_records(since=since)[:20]:
             self.usage_tree.insert(
                 "", "end",
                 values=(rec["created_at"], rec["account"], rec["model"], rec["total_tokens"], fmt_money(rec["cost"])),
             )
+
+        daily = usage_daily(days=14)
+        self._draw_bars(self.cost_canvas, daily, "cost", lambda v: f"¥{v:.2f}", BAR_COLOR_COST)
+        self._draw_bars(self.token_canvas, daily, "tokens", lambda v: f"{v:,}", BAR_COLOR_TOKEN)
+        self._draw_pie(self.pie_canvas, usage_breakdown(since=since))
+
+    # ---------- 图表绘制 ----------
+
+    def _draw_bars(self, canvas, daily, value_key, fmt, color):
+        canvas.delete("all")
+        w, h = _canvas_size(canvas, 420, 220)
+        ml, mr, mt, mb = 52, 8, 16, 26
+        pw, ph = w - ml - mr, h - mt - mb
+        max_v = max((d[value_key] for d in daily), default=0) or 1
+        n = len(daily)
+        slot = pw / max(n, 1)
+        bar_w = min(slot * 0.6, 34)
+        font = ("Microsoft YaHei", 8)
+        for i, d in enumerate(daily):
+            v = d[value_key]
+            bh = ph * v / max_v
+            x0 = ml + i * slot + (slot - bar_w) / 2
+            y0 = mt + ph - bh
+            canvas.create_rectangle(x0, y0, x0 + bar_w, mt + ph, fill=color, outline="")
+            if bh > 12:
+                canvas.create_text(x0 + bar_w / 2, y0 - 6, text=fmt(v), fill=TEXT, font=font)
+            if i % 2 == 0:
+                canvas.create_text(x0 + bar_w / 2, mt + ph + 12, text=d["day"][5:], fill=GRID, font=font)
+        for g in range(5):
+            gy = mt + ph - ph * g / 4
+            canvas.create_line(ml, gy, ml + pw, gy, fill=GRID, dash=(2, 2))
+            canvas.create_text(ml - 5, gy, text=fmt(max_v * g / 4), anchor="e", fill=TEXT, font=font)
+        canvas.create_line(ml, mt + ph, ml + pw, mt + ph, fill=TEXT)
+        canvas.create_line(ml, mt, ml, mt + ph, fill=TEXT)
+
+    def _draw_pie(self, canvas, breakdown):
+        canvas.delete("all")
+        w, h = _canvas_size(canvas, 300, 220)
+        cx, cy = w * 0.32, h * 0.48
+        r = min(w, h) * 0.36
+        items = [
+            ("输入(命中缓存)", breakdown["cache_hit"], PIE_COLORS["cache_hit"]),
+            ("输入(未命中缓存)", breakdown["cache_miss"], PIE_COLORS["cache_miss"]),
+            ("输出", breakdown["output"], PIE_COLORS["output"]),
+        ]
+        total = sum(v for _, v, _ in items) or 1
+        start = 90.0
+        font = ("Microsoft YaHei", 8)
+        for label, v, color in items:
+            if v <= 0:
+                continue
+            extent = -360.0 * v / total
+            canvas.create_arc(
+                cx - r, cy - r, cx + r, cy + r,
+                start=start, extent=extent, fill=color, outline=BG, width=1,
+            )
+            start += extent
+        lx = w * 0.62
+        ly = h * 0.16
+        for label, v, color in items:
+            pct = 100.0 * v / total
+            canvas.create_rectangle(lx, ly, lx + 12, ly + 12, fill=color, outline="")
+            canvas.create_text(
+                lx + 18, ly + 6, anchor="w",
+                text=f"{label}  {pct:.1f}%", fill=TEXT, font=font,
+            )
+            ly += 24
 
 
 def run_app(interval: int = 30, save: bool = False) -> int:

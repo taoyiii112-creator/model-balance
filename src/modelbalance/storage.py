@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from .models import Balance, UsageRecord
@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS usage_records (
     completion_tokens INTEGER NOT NULL DEFAULT 0,
     total_tokens INTEGER NOT NULL DEFAULT 0,
     cost REAL,
-    note TEXT DEFAULT ''
+    note TEXT DEFAULT '',
+    prompt_cache_hit_tokens INTEGER NOT NULL DEFAULT 0,
+    prompt_cache_miss_tokens INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS balance_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,6 +52,16 @@ def _db():
 def init_db() -> None:
     with _db() as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """旧库补充新增列（幂等）。"""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(usage_records)")}
+    if "prompt_cache_hit_tokens" not in cols:
+        conn.execute("ALTER TABLE usage_records ADD COLUMN prompt_cache_hit_tokens INTEGER NOT NULL DEFAULT 0")
+    if "prompt_cache_miss_tokens" not in cols:
+        conn.execute("ALTER TABLE usage_records ADD COLUMN prompt_cache_miss_tokens INTEGER NOT NULL DEFAULT 0")
 
 
 def add_usage_record(rec: UsageRecord) -> int:
@@ -57,8 +69,9 @@ def add_usage_record(rec: UsageRecord) -> int:
     with _db() as conn:
         cur = conn.execute(
             """INSERT INTO usage_records
-               (account, model, created_at, prompt_tokens, completion_tokens, total_tokens, cost, note)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (account, model, created_at, prompt_tokens, completion_tokens, total_tokens,
+                cost, note, prompt_cache_hit_tokens, prompt_cache_miss_tokens)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 rec.account,
                 rec.model,
@@ -68,6 +81,8 @@ def add_usage_record(rec: UsageRecord) -> int:
                 rec.total_tokens,
                 rec.cost,
                 rec.note,
+                rec.prompt_cache_hit_tokens,
+                rec.prompt_cache_miss_tokens,
             ),
         )
         return cur.lastrowid
@@ -101,7 +116,67 @@ def usage_totals(account: str | None = None, since: datetime | None = None) -> d
         "prompt_tokens": sum(r["prompt_tokens"] for r in records),
         "completion_tokens": sum(r["completion_tokens"] for r in records),
         "total_tokens": sum(r["total_tokens"] for r in records),
+        "prompt_cache_hit_tokens": sum(r["prompt_cache_hit_tokens"] for r in records),
+        "prompt_cache_miss_tokens": sum(r["prompt_cache_miss_tokens"] for r in records),
         "cost": sum(r["cost"] or 0 for r in records),
+    }
+
+
+def usage_daily(account: str | None = None, days: int = 30) -> list[dict]:
+    """按天聚合消费金额与 Token 数（含无数据的零值天），用于柱状图。"""
+    init_db()
+    days = max(1, days)
+    start = (datetime.now() - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    sql = """SELECT substr(created_at, 1, 10) AS day,
+                    SUM(cost) AS cost, SUM(total_tokens) AS tokens
+             FROM usage_records WHERE created_at >= ?"""
+    params: list = [start.isoformat(timespec="seconds")]
+    if account:
+        sql += " AND account = ?"
+        params.append(account)
+    sql += " GROUP BY day ORDER BY day"
+    with _db() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, params).fetchall()
+    by_day = {r["day"]: r for r in rows}
+    result = []
+    for i in range(days):
+        day = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+        r = by_day.get(day)
+        result.append(
+            {
+                "day": day,
+                "cost": round(float(r["cost"] or 0), 4) if r else 0.0,
+                "tokens": int(r["tokens"] or 0) if r else 0,
+            }
+        )
+    return result
+
+
+def usage_breakdown(account: str | None = None, since: datetime | None = None) -> dict:
+    """Token 构成：输入(命中缓存) / 输入(未命中缓存) / 输出，用于扇形图。"""
+    init_db()
+    sql = """SELECT COALESCE(SUM(prompt_cache_hit_tokens), 0) AS hit,
+                    COALESCE(SUM(prompt_cache_miss_tokens), 0) AS miss,
+                    COALESCE(SUM(completion_tokens), 0) AS output
+             FROM usage_records"""
+    clauses: list[str] = []
+    params: list = []
+    if account:
+        clauses.append("account = ?")
+        params.append(account)
+    if since:
+        clauses.append("created_at >= ?")
+        params.append(since.isoformat(timespec="seconds"))
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    with _db() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(sql, params).fetchone()
+    return {
+        "cache_hit": int(row["hit"]),
+        "cache_miss": int(row["miss"]),
+        "output": int(row["output"]),
     }
 
 

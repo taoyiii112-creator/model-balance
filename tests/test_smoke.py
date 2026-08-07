@@ -108,5 +108,55 @@ class TestOpenAIParse(unittest.TestCase):
         with self.assertRaises(ProviderError):
             parse_balance("oa-1", {"foo": 1})
 
+class TestUsageStats(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name)
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_cache_breakdown(self):
+        import modelbalance.storage as storage
+        from datetime import datetime
+
+        storage.init_db()
+        storage.add_usage_record(
+            UsageRecord(
+                account="cache-test", model="deepseek-chat",
+                prompt_tokens=300, completion_tokens=50,
+                prompt_cache_hit_tokens=200, prompt_cache_miss_tokens=100,
+                cost=0.5,
+            )
+        )
+        bd = storage.usage_breakdown(account="cache-test")
+        self.assertEqual(bd["cache_hit"], 200)
+        self.assertEqual(bd["cache_miss"], 100)
+        self.assertEqual(bd["output"], 50)
+
+    def test_daily_aggregation(self):
+        import modelbalance.storage as storage
+        from datetime import datetime
+
+        storage.init_db()
+        storage.add_usage_record(
+            UsageRecord(account="daily-test", model="m", prompt_tokens=100, completion_tokens=50, cost=0.12)
+        )
+        daily = storage.usage_daily(account="daily-test", days=7)
+        self.assertEqual(len(daily), 7)
+        last = daily[-1]
+        self.assertEqual(last["day"], datetime.now().strftime("%Y-%m-%d"))
+        self.assertGreaterEqual(last["tokens"], 150)
+        self.assertGreaterEqual(last["cost"], 0.12)
+
 if __name__ == "__main__":
     unittest.main()
