@@ -16,6 +16,14 @@
 
 ## 日期：2026-08-07
 
+完成：手机 App 更新提示增强（v0.2.1）——更新弹窗显示 Release 更新说明与更新包大小（读 GitHub 资产 size），下载进度条显示"已下载 X / Y MB"。analyze 零问题、19 个测试通过，APK v0.2.1 已打包。
+
+影响：用户更新前可知晓更新内容和所需空间。
+
+备注：——
+
+## 日期：2026-08-07
+
 完成：手机 App 同步缓存命中字段与用量图表（每日柱状图金额/Token 切换 + Token 构成扇形图）；新增应用内更新 v0.2.0——启动自动检查 + 设置页手动检查 GitHub Release，下载 APK 并唤起系统安装器；修复 Kotlin 增量编译跨盘符报错（gradle.properties 关闭 kotlin.incremental）。analyze 零问题、17 个测试通过，APK v0.2.0（49.8MB）已打包。
 
 影响：手机端与桌面/网页版图表功能对齐；后续发版只需 GitHub Release 传 APK，用户 App 内一键更新。
