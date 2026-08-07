@@ -130,6 +130,15 @@ def cmd_app(args) -> int:
     return run_app(interval=args.interval, save=args.save)
 
 
+def cmd_proxy(args) -> int:
+    try:
+        from .proxy import run_proxy
+    except ImportError as exc:
+        print(f"无法启动用量代理: {exc}")
+        return 1
+    return run_proxy(host=args.host, port=args.port)
+
+
 def cmd_init_db(args) -> int:
     init_db()
     print("数据库已初始化")
@@ -176,6 +185,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_app.add_argument("--interval", type=int, default=30, help="自动刷新秒数")
     p_app.add_argument("--save", action="store_true", help="每次查询保存余额快照")
     p_app.set_defaults(func=cmd_app)
+
+    p_proxy = sub.add_parser("proxy", help="启动本地 API 代理（自动记录 Token 用量）")
+    p_proxy.add_argument("--host", default="127.0.0.1")
+    p_proxy.add_argument("--port", type=int, default=8001)
+    p_proxy.set_defaults(func=cmd_proxy)
 
     p_db = sub.add_parser("init-db", help="初始化本地数据库")
     p_db.set_defaults(func=cmd_init_db)

@@ -158,5 +158,125 @@ class TestUsageStats(unittest.TestCase):
         self.assertGreaterEqual(last["tokens"], 150)
         self.assertGreaterEqual(last["cost"], 0.12)
 
+import json
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib import request as urlrequest
+
+from modelbalance.config import Account
+
+
+class TestUsageParse(unittest.TestCase):
+    def test_deepseek_style(self):
+        from modelbalance.proxy import extract_usage
+
+        u = extract_usage(
+            {"usage": {"prompt_tokens": 300, "completion_tokens": 50, "prompt_cache_hit_tokens": 200, "prompt_cache_miss_tokens": 100}}
+        )
+        self.assertEqual(u, {"prompt": 300, "completion": 50, "hit": 200, "miss": 100})
+
+    def test_openai_style(self):
+        from modelbalance.proxy import extract_usage
+
+        u = extract_usage(
+            {"usage": {"prompt_tokens": 300, "completion_tokens": 50, "prompt_tokens_details": {"cached_tokens": 120}}}
+        )
+        self.assertEqual(u["hit"], 120)
+        self.assertEqual(u["miss"], 180)
+
+    def test_estimate_cost(self):
+        from modelbalance.proxy import estimate_cost
+
+        usage = {"prompt": 300, "completion": 50, "hit": 200, "miss": 100}
+        cost = estimate_cost({"input": 2.0, "input_cache_hit": 0.5, "output": 8.0}, usage)
+        self.assertAlmostEqual(cost, (100 * 2.0 + 200 * 0.5 + 50 * 8.0) / 1_000_000, places=8)
+        self.assertIsNone(estimate_cost(None, usage))
+
+
+class FakeUpstream(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        self.rfile.read(length)
+        body = json.dumps(
+            {
+                "id": "fake-1",
+                "object": "chat.completion",
+                "model": "deepseek-chat",
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}],
+                "usage": {
+                    "prompt_tokens": 300,
+                    "completion_tokens": 50,
+                    "total_tokens": 350,
+                    "prompt_cache_hit_tokens": 200,
+                    "prompt_cache_miss_tokens": 100,
+                },
+            }
+        ).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):
+        pass
+
+
+class TestProxyIntegration(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+        from modelbalance.proxy import ProxyHandler
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name)
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+
+        os.environ["TEST_API_KEY"] = "sk-test"
+        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), FakeUpstream)
+        threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
+
+        ProxyHandler.accounts = [
+            Account(
+                name="relay-test",
+                provider="openai_compat",
+                api_key_env="TEST_API_KEY",
+                base_url=f"http://127.0.0.1:{self.upstream.server_port}",
+            )
+        ]
+        self.proxy = ThreadingHTTPServer(("127.0.0.1", 0), ProxyHandler)
+        threading.Thread(target=self.proxy.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        self.proxy.shutdown()
+        self.upstream.shutdown()
+        self.proxy.server_close()
+        self.upstream.server_close()
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_proxy_records_usage(self):
+        import modelbalance.storage as storage
+
+        req = urlrequest.Request(
+            f"http://127.0.0.1:{self.proxy.server_port}/v1/chat/completions",
+            data=json.dumps({"model": "deepseek-chat", "messages": [{"role": "user", "content": "hi"}]}).encode("utf-8"),
+            headers={"Authorization": "Bearer sk-test", "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlrequest.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        self.assertEqual(data["model"], "deepseek-chat")
+        recs = storage.list_usage_records("relay-test")
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]["prompt_cache_hit_tokens"], 200)
+        self.assertEqual(recs[0]["prompt_cache_miss_tokens"], 100)
+        self.assertEqual(recs[0]["completion_tokens"], 50)
+
 if __name__ == "__main__":
     unittest.main()

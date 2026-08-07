@@ -49,6 +49,24 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 
 `add-usage` 参数：`--prompt`（输入 Token 总数）、`--cache-hit`（输入命中缓存）、`--cache-miss`（输入未命中缓存）、`--completion`（输出）、`--cost`（费用）。提供 cache-hit/miss 时 prompt 自动等于两者之和。
 
+## 用量自动采集（代理模式）
+
+把客户端的 base_url 指向本机代理，所有请求自动记录真实用量（输入 / 输出 / 缓存命中）：
+
+1. 启动代理：双击 `启动用量代理.bat`，或运行 `python run.py proxy`（默认 http://127.0.0.1:8001）。
+2. 客户端配置：base_url 改为 `http://127.0.0.1:8001/v1`，API Key 保持原样（必须是 config.json 已配置账户的 Key）。
+3. 每次请求自动写入本地数据库，图表实时更新（note 标记为 proxy）。
+
+可选：在 config.json 账户的 extra 里配置单价（每百万 Token），代理会自动估算费用：
+
+```json
+"extra": {
+  "pricing": { "input": 2.0, "input_cache_hit": 0.5, "output": 8.0 }
+}
+```
+
+不配置 pricing 时，费用列不记录（Token 照常记录）。
+
 ## 配置说明
 
 ### .env（敏感信息，不提交）
