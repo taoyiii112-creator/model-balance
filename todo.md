@@ -2,17 +2,18 @@
 
 - 接入中转渠道：填 RELAY_API_KEY，并把 config.json 的 base_url 改成真实地址（待用户提供）
 - 可选：OpenAI 官方（填 OPENAI_API_KEY 后验证）
-- 手机 App（Flutter）：实机验证中——已修复发布版网络权限并重新打包，待重装新 APK 确认
+- 手机 App（Flutter）：v0.2.0（图表 + 应用内更新）已打包，待实机安装验证
 
 # 待完成
 
-- 手机 App 同步缓存命中字段与用量图表
 - Token 用量自动采集（代理层或渠道用量接口）
 - 余额趋势图与低余额告警
 - 打包为独立 exe（可选）
 
 # 完成
 
+- 2026-08-07 手机 App 应用内更新（v0.2.0）：检查 GitHub Release、下载并安装新版本
+- 2026-08-07 手机 App 用量图表：每日柱状图 + Token 构成扇形图（与桌面/网页版同步，缓存命中字段拆分）
 - 2026-08-07 用量图表：桌面与网页版按天消费/Token 柱状图 + 输入输出构成扇形图；数据模型缓存命中拆分（旧库自动迁移）
 - 2026-08-07 手机 App APK 打包成功：安装 Android SDK 36.1.0，构建源切换为腾讯/阿里云镜像，flutter build apk 产出 app-release.apk（48.7MB）
 - 2026-08-07 手机 App 工程化：Flutter SDK 3.44.8 安装（中国镜像）、生成 android/ios 平台工程、flutter analyze 零问题、7 个测试通过
