@@ -6,6 +6,8 @@ import queue
 import subprocess
 import sys
 import threading
+import time
+from urllib import request as urlrequest
 import tkinter as tk
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,7 +17,7 @@ from . import __version__
 from .config import PROJECT_ROOT, load_accounts, load_env
 from .fetcher import fetch_all
 from .logutil import get_logger
-from .proxy import ensure_proxy
+from .proxy import ensure_proxy, proxy_is_running
 from .storage import (
     add_snapshot,
     list_usage_records,
@@ -68,6 +70,7 @@ class BalanceApp:
         self._auto_scheduled = False
         self._bar_meta: dict = {}
         self._last_snapshot: dict = {}
+        self._proxy_pid: int | None = None
 
         root.title("模型余额仪表盘")
         root.geometry("1220x1180")
@@ -156,11 +159,13 @@ class BalanceApp:
         self.trend_canvas = tk.Canvas(trend_frame, width=1160, height=200, bg=BG, highlightthickness=0)
         self.trend_canvas.pack(fill="both", expand=True)
 
-        # 用量代理自动拉起（无需手动启动）
-        if ensure_proxy(port=8001, quiet=True):
+        # 用量代理自动拉起（无需手动启动）；记录自己拉起的子进程，退出时优雅关闭
+        self._proxy_pid = ensure_proxy(port=8001, quiet=True)
+        if proxy_is_running(8001):
             self.proxy_var.set("用量代理: 运行中")
         else:
-            self.proxy_var.set("用量代理: 未运行（端口被占用）")
+            self.proxy_var.set("用量代理: 未运行")
+        root.protocol("WM_DELETE_WINDOW", self._on_close)
         threading.Thread(target=self._auto_check_update, daemon=True).start()
 
         logger.info("BalanceApp.__init__: 初始化完成，进入定时器")
@@ -523,8 +528,37 @@ class BalanceApp:
             messagebox.showerror("更新失败", f"准备更新失败: {exc}", parent=self.root)
             self.update_var.set("更新: 准备失败")
             return
+        if self._proxy_pid:
+            self._stop_spawned_proxy()
         messagebox.showinfo("更新", "更新已准备好，应用即将重启完成安装。", parent=self.root)
         self.root.destroy()
+
+    def _on_close(self):
+        if self._proxy_pid:
+            self._stop_spawned_proxy()
+        self.root.destroy()
+
+    def _stop_spawned_proxy(self):
+        """优雅关闭自己拉起的代理子进程（避免占用文件导致 PyInstaller 清理失败）。"""
+        try:
+            urlrequest.urlopen("http://127.0.0.1:8001/__mb_shutdown", timeout=3)
+        except Exception:  # noqa: BLE001
+            pass
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            r = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {self._proxy_pid}"],
+                capture_output=True, text=True,
+            )
+            if str(self._proxy_pid) not in r.stdout:
+                break
+            time.sleep(0.3)
+        else:
+            subprocess.run(
+                ["taskkill", "/PID", str(self._proxy_pid), "/F"],
+                capture_output=True,
+            )
+        self._proxy_pid = None
 
     def _spawn_dev_updater(self):
         exe = Path(sys.executable)

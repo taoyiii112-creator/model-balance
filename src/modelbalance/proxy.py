@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import threading
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -80,10 +81,25 @@ class ProxyHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_GET(self):
-        if urlparse(self.path).path == "/__mb_health":
+        path = urlparse(self.path).path
+        if path == "/__mb_health":
             self._send_json(200, {"service": "modelbalance-proxy", "ok": True})
             return
+        if path == "/__mb_shutdown":
+            threading.Thread(target=self._shutdown_server, daemon=True).start()
+            self._send_json(200, {"ok": True})
+            return
         self._handle("GET")
+
+    @staticmethod
+    def _shutdown_server(server):
+        import time
+
+        time.sleep(0.2)
+        try:
+            server.shutdown()
+        except Exception:  # noqa: BLE001
+            pass
 
     def do_POST(self):
         self._handle("POST")
@@ -258,15 +274,15 @@ def ensure_proxy(port: int = 8001, quiet: bool = False) -> bool:
     if proxy_is_running(port):
         if not quiet:
             print(f"用量代理已在运行: http://127.0.0.1:{port}")
-        return True
+        return None
     if _port_in_use(port):
         if not quiet:
             print(f"端口 {port} 被其他程序占用，未启动用量代理")
         logger.warning("端口 %s 被其他程序占用，未启动用量代理", port)
-        return False
+        return None
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     if getattr(sys, "frozen", False):
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [str(Path(sys.executable)), "--proxy"],
             cwd=str(PROJECT_ROOT),
             creationflags=flags,
@@ -275,11 +291,14 @@ def ensure_proxy(port: int = 8001, quiet: bool = False) -> bool:
         exe = Path(sys.executable)
         pyw = exe.with_name("pythonw.exe")
         target = pyw if pyw.exists() else exe
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [str(target), str(PROJECT_ROOT / "run.py"), "proxy", "--port", str(port)],
             cwd=str(PROJECT_ROOT),
             creationflags=flags,
         )
+    if not quiet:
+        print(f"已自动启动用量代理: http://127.0.0.1:{port}")
+    return proc.pid
     if not quiet:
         print(f"已自动启动用量代理: http://127.0.0.1:{port}")
     return True
