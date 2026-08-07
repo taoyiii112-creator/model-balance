@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 
 from .config import PROJECT_ROOT
+from .logutil import get_logger
 
 GITHUB_OWNER = "taoyiii112-creator"
 GITHUB_REPO = "model-balance"
@@ -52,6 +53,8 @@ def set_update_source(url: str) -> None:
         json.dumps({"url": url}, ensure_ascii=False), encoding="utf-8"
     )
 SKIP_ON_APPLY = {".env", "data", "config.json", ".git", "dist", "__pycache__", ".pytest_cache", ".idea", ".vscode"}
+STAGING_DIR = PROJECT_ROOT / "data" / "update_staging"
+logger = get_logger("updater")
 
 
 def parse_version(v: str) -> tuple:
@@ -101,6 +104,10 @@ def fetch_latest_release(source_url: str | None = None, timeout: int = 20) -> di
     except HTTPError as exc:
         if exc.code == 404:
             return None
+        logger.warning("检查更新失败 HTTP %s", exc.code)
+        raise
+    except (URLError, OSError) as exc:
+        logger.warning("检查更新网络失败: %s", exc)
         raise
     return parse_release(data)
 
@@ -134,6 +141,7 @@ def download_asset(url: str, dest: Path, progress_cb=None) -> Path:
                     progress_cb(done, total)
         tmp.replace(dest)
     validate_zip(dest)
+    logger.info("更新包已下载: %s", dest.name)
     return dest
 
 
@@ -143,6 +151,16 @@ def validate_zip(path: Path) -> None:
         bad = zf.testzip()
         if bad is not None:
             raise ValueError(f"更新包校验失败: {bad}")
+
+
+def stage_update(zip_path: Path) -> Path:
+    """解压更新包到暂存目录；主应用退出后由 apply_staged.py 应用（避免覆盖运行中文件失败）。"""
+    if STAGING_DIR.exists():
+        shutil.rmtree(STAGING_DIR, ignore_errors=True)
+    STAGING_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.unpack_archive(str(zip_path), str(STAGING_DIR), "zip")
+    logger.info("更新已暂存到 %s", STAGING_DIR)
+    return STAGING_DIR
 
 
 def cleanup_updates(updates_dir: Path = PROJECT_ROOT / "data" / "updates", keep: Path | None = None) -> None:

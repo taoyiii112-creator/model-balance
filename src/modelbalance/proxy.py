@@ -18,6 +18,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 
 from .config import PROJECT_ROOT, load_accounts, load_env
+from .logutil import get_logger
 from .models import UsageRecord
 from .storage import add_usage_record
 
@@ -71,11 +72,17 @@ def estimate_cost(pricing: dict | None, usage: dict) -> float | None:
     )
 
 
+logger = get_logger("proxy")
+
+
 class ProxyHandler(BaseHTTPRequestHandler):
     accounts: list = []
     protocol_version = "HTTP/1.1"
 
     def do_GET(self):
+        if urlparse(self.path).path == "/__mb_health":
+            self._send_json(200, {"service": "modelbalance-proxy", "ok": True})
+            return
         self._handle("GET")
 
     def do_POST(self):
@@ -224,14 +231,26 @@ class ProxyHandler(BaseHTTPRequestHandler):
         pass
 
 
-def proxy_is_running(port: int = 8001) -> bool:
-    """检测本机端口是否已有代理在监听。"""
+def _port_in_use(port: int = 8001) -> bool:
+    """端口被监听但健康检查失败（可能是其他程序占用）。"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.3)
+        s.settimeout(0.5)
         try:
             return s.connect_ex(("127.0.0.1", port)) == 0
         except OSError:
             return False
+
+
+def proxy_is_running(port: int = 8001) -> bool:
+    """检测端口上是否运行着本应用的用量代理（含健康检查，避免误判其他程序）。"""
+    if not _port_in_use(port):
+        return False
+    try:
+        with urlrequest.urlopen(f"http://127.0.0.1:{port}/__mb_health", timeout=2) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("service") == "modelbalance-proxy"
+    except (URLError, OSError, ValueError):
+        return False
 
 
 def ensure_proxy(port: int = 8001, quiet: bool = False) -> bool:
@@ -240,6 +259,11 @@ def ensure_proxy(port: int = 8001, quiet: bool = False) -> bool:
         if not quiet:
             print(f"用量代理已在运行: http://127.0.0.1:{port}")
         return True
+    if _port_in_use(port):
+        if not quiet:
+            print(f"端口 {port} 被其他程序占用，未启动用量代理")
+        logger.warning("端口 %s 被其他程序占用，未启动用量代理", port)
+        return False
     exe = Path(sys.executable)
     pyw = exe.with_name("pythonw.exe")
     target = pyw if pyw.exists() else exe
@@ -262,6 +286,7 @@ def run_proxy(host: str = "127.0.0.1", port: int = 8001) -> int:
         return 1
     ProxyHandler.accounts = accounts
     server = ThreadingHTTPServer((host, port), ProxyHandler)
+    logger.info("用量记录代理已启动: http://%s:%s", host, port)
     print(f"用量记录代理已启动: http://{host}:{port}")
     print(f"使用方法：把客户端的 base_url 改为 http://{host}:{port}/v1，API Key 保持原样")
     try:
@@ -270,4 +295,5 @@ def run_proxy(host: str = "127.0.0.1", port: int = 8001) -> int:
         print("\n已停止")
     finally:
         server.server_close()
+        logger.info("用量记录代理已停止")
     return 0

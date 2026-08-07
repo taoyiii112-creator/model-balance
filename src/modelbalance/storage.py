@@ -181,6 +181,22 @@ def usage_breakdown(account: str | None = None, since: datetime | None = None) -
     }
 
 
+def snapshot_history(account: str | None = None, days: int = 30) -> list[dict]:
+    """余额快照历史（按时间升序），用于趋势图。"""
+    init_db()
+    start = (datetime.now() - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+    sql = "SELECT account, provider, currency, available, total, used, created_at FROM balance_snapshots WHERE created_at >= ?"
+    params: list = [start.isoformat(timespec="seconds")]
+    if account:
+        sql += " AND account = ?"
+        params.append(account)
+    sql += " ORDER BY created_at ASC"
+    with _db() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
+
+
 def add_snapshot(balance: Balance) -> int:
     init_db()
     with _db() as conn:

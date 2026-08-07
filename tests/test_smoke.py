@@ -458,5 +458,137 @@ class TestUpdaterMore(unittest.TestCase):
             cleanup_updates(d)
             self.assertFalse((d / "a.zip").exists())
 
+class TestSnapshots(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name)
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_snapshot_history(self):
+        import modelbalance.storage as storage
+        from modelbalance.models import Balance
+
+        storage.init_db()
+        storage.add_snapshot(Balance(account="ds-main", provider="deepseek", currency="CNY", available=10.0))
+        storage.add_snapshot(Balance(account="ds-main", provider="deepseek", currency="CNY", available=9.5))
+        hist = storage.snapshot_history(account="ds-main", days=30)
+        self.assertEqual(len(hist), 2)
+        self.assertEqual(hist[0]["available"], 10.0)
+        self.assertEqual(hist[1]["available"], 9.5)
+
+
+class TestWeb(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name)
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+
+        from modelbalance.web import Handler
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        self.server.shutdown()
+        self.server.server_close()
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_page_and_usage_api(self):
+        base = f"http://127.0.0.1:{self.server.server_port}"
+        with urlrequest.urlopen(base + "/", timeout=10) as resp:
+            page = resp.read().decode("utf-8")
+        self.assertIn('id="bal"', page)
+        self.assertIn("costChart", page)
+        with urlrequest.urlopen(base + "/api/usage", timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        self.assertIn("totals", data)
+        self.assertIn("daily", data)
+        self.assertIn("breakdown", data)
+
+
+class TestCli(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name)
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_parser_subcommands(self):
+        from modelbalance import cli
+
+        parser = cli.build_parser()
+        names = set(parser._subparsers._group_actions[0].choices.keys())
+        for expected in ("balance", "usage", "add-usage", "watch", "web", "app", "proxy", "init-db", "set-update-source"):
+            self.assertIn(expected, names)
+
+    def test_add_usage_command(self):
+        import argparse
+
+        import modelbalance.storage as storage
+        from modelbalance import cli
+
+        args = argparse.Namespace(
+            account="cli-test", model="deepseek-chat", prompt=0,
+            cache_hit=10, cache_miss=5, completion=3, cost=0.1, note="x",
+        )
+        rc = cli.cmd_add_usage(args)
+        self.assertEqual(rc, 0)
+        totals = storage.usage_totals(account="cli-test")
+        self.assertEqual(totals["prompt_cache_hit_tokens"], 10)
+        self.assertEqual(totals["prompt_cache_miss_tokens"], 5)
+        self.assertEqual(totals["completion_tokens"], 3)
+        self.assertEqual(cli.cmd_usage(argparse.Namespace(account="cli-test", since=None)), 0)
+
+
+class TestProxyHealth(unittest.TestCase):
+    def test_health_endpoint(self):
+        import modelbalance.storage as storage
+        from modelbalance.proxy import ProxyHandler, proxy_is_running
+
+        with tempfile.TemporaryDirectory() as td:
+            storage.DATA_DIR = Path(td)
+            storage.DB_PATH = storage.DATA_DIR / "test.db"
+            ProxyHandler.accounts = []
+            srv = ThreadingHTTPServer(("127.0.0.1", 0), ProxyHandler)
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            try:
+                self.assertTrue(proxy_is_running(srv.server_port))
+                with urlrequest.urlopen(f"http://127.0.0.1:{srv.server_port}/__mb_health", timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(data["service"], "modelbalance-proxy")
+                self.assertFalse(proxy_is_running(59998))
+            finally:
+                srv.shutdown()
+                srv.server_close()
+
 if __name__ == "__main__":
     unittest.main()

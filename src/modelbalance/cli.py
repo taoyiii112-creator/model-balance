@@ -127,7 +127,7 @@ def cmd_app(args) -> int:
     except ImportError as exc:
         print(f"无法启动桌面应用: {exc}")
         return 1
-    return run_app(interval=args.interval, save=args.save)
+    return run_app(interval=args.interval, save=not args.no_save)
 
 
 def cmd_proxy(args) -> int:
@@ -198,7 +198,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_app = sub.add_parser("app", help="启动桌面应用（推荐）")
     p_app.add_argument("--interval", type=int, default=30, help="自动刷新秒数")
-    p_app.add_argument("--save", action="store_true", help="每次查询保存余额快照")
+    p_app.add_argument("--no-save", action="store_true", help="不自动保存余额快照（默认保存）")
     p_app.set_defaults(func=cmd_app)
 
     p_proxy = sub.add_parser("proxy", help="启动本地 API 代理（自动记录 Token 用量）")
