@@ -17,12 +17,16 @@ from .storage import (
     usage_totals,
 )
 
-BG = "#1e293b"
-GRID = "#334155"
-TEXT = "#e2e8f0"
-BAR_COLOR_COST = "#f59e0b"
-BAR_COLOR_TOKEN = "#38bdf8"
-PIE_COLORS = {"cache_hit": "#22c55e", "cache_miss": "#3b82f6", "output": "#f97316"}
+BG = "#0f172a"
+GRID = "#475569"
+TEXT = "#f8fafc"
+DAY_TEXT = "#94a3b8"
+BAR_COLOR_COST = "#f87171"      # 消费金额：亮红
+BAR_COLOR_TOKEN = "#4ade80"     # Token 用量：亮绿
+PIE_COLORS = {"cache_hit": "#4ade80", "cache_miss": "#60a5fa", "output": "#fb923c"}
+FONT_VAL = ("Microsoft YaHei", 10)
+FONT_DAY = ("Microsoft YaHei", 10)
+FONT_TIP = ("Microsoft YaHei", 10)
 
 
 def fmt_money(value) -> str:
@@ -43,10 +47,11 @@ class BalanceApp:
         self._q: queue.Queue = queue.Queue()
         self._fetching = False
         self._auto_scheduled = False
+        self._bar_meta: dict = {}
 
         root.title("模型余额仪表盘")
-        root.geometry("1220x920")
-        root.minsize(1000, 780)
+        root.geometry("1240x960")
+        root.minsize(1000, 800)
 
         # 顶部控制栏
         bar = ttk.Frame(root, padding=8)
@@ -81,6 +86,12 @@ class BalanceApp:
         ttk.Label(root, text="Token 用量记录（近 30 天）", padding=(8, 6)).pack(anchor="w")
         self.usage_summary_var = tk.StringVar(value="-")
         ttk.Label(root, textvariable=self.usage_summary_var, padding=(8, 0)).pack(anchor="w")
+        ttk.Label(
+            root,
+            text="注：Token 用量为本地手动记录（add-usage 录入），非官方接口数据，与官网可能不一致",
+            padding=(8, 0),
+            foreground="#94a3b8",
+        ).pack(anchor="w")
         use_cols = ("time", "account", "model", "tokens", "cost")
         self.usage_tree = ttk.Treeview(root, columns=use_cols, show="headings", height=5)
         use_head = {"time": "时间", "account": "账户", "model": "模型", "tokens": "Token", "cost": "费用"}
@@ -95,20 +106,20 @@ class BalanceApp:
 
         self.cost_frame = ttk.Frame(charts)
         self.cost_frame.pack(side="left", fill="both", expand=True)
-        ttk.Label(self.cost_frame, text="每日消费金额（近 14 天）", padding=(4, 2)).pack(anchor="w")
-        self.cost_canvas = tk.Canvas(self.cost_frame, width=420, height=220, bg=BG, highlightthickness=0)
+        ttk.Label(self.cost_frame, text="每日消费金额（近 14 天，悬停柱子看数值）", padding=(4, 2)).pack(anchor="w")
+        self.cost_canvas = tk.Canvas(self.cost_frame, width=420, height=230, bg=BG, highlightthickness=0)
         self.cost_canvas.pack(fill="both", expand=True)
 
         self.token_frame = ttk.Frame(charts)
         self.token_frame.pack(side="left", fill="both", expand=True)
-        ttk.Label(self.token_frame, text="每日 Token 用量（近 14 天）", padding=(4, 2)).pack(anchor="w")
-        self.token_canvas = tk.Canvas(self.token_frame, width=420, height=220, bg=BG, highlightthickness=0)
+        ttk.Label(self.token_frame, text="每日 Token 用量（近 14 天，悬停柱子看数值）", padding=(4, 2)).pack(anchor="w")
+        self.token_canvas = tk.Canvas(self.token_frame, width=420, height=230, bg=BG, highlightthickness=0)
         self.token_canvas.pack(fill="both", expand=True)
 
         self.pie_frame = ttk.Frame(charts)
         self.pie_frame.pack(side="left", fill="both", expand=True)
         ttk.Label(self.pie_frame, text="Token 构成（近 30 天）", padding=(4, 2)).pack(anchor="w")
-        self.pie_canvas = tk.Canvas(self.pie_frame, width=300, height=220, bg=BG, highlightthickness=0)
+        self.pie_canvas = tk.Canvas(self.pie_frame, width=320, height=230, bg=BG, highlightthickness=0)
         self.pie_canvas.pack(fill="both", expand=True)
 
         self.root.after(200, self._poll_queue)
@@ -193,35 +204,83 @@ class BalanceApp:
 
     def _draw_bars(self, canvas, daily, value_key, fmt, color):
         canvas.delete("all")
-        w, h = _canvas_size(canvas, 420, 220)
-        ml, mr, mt, mb = 52, 8, 16, 26
+        w, h = _canvas_size(canvas, 420, 230)
+        ml, mr, mt, mb = 58, 10, 20, 32
         pw, ph = w - ml - mr, h - mt - mb
         max_v = max((d[value_key] for d in daily), default=0) or 1
         n = len(daily)
         slot = pw / max(n, 1)
-        bar_w = min(slot * 0.6, 34)
-        font = ("Microsoft YaHei", 8)
+        bar_w = min(slot * 0.62, 38)
+        bar_ids = []
         for i, d in enumerate(daily):
             v = d[value_key]
             bh = ph * v / max_v
             x0 = ml + i * slot + (slot - bar_w) / 2
             y0 = mt + ph - bh
-            canvas.create_rectangle(x0, y0, x0 + bar_w, mt + ph, fill=color, outline="")
-            if bh > 12:
-                canvas.create_text(x0 + bar_w / 2, y0 - 6, text=fmt(v), fill=TEXT, font=font)
+            bid = canvas.create_rectangle(x0, y0, x0 + bar_w, mt + ph, fill=color, outline="")
+            bar_ids.append(bid)
+            if bh > 18:
+                canvas.create_text(x0 + bar_w / 2, y0 - 8, text=fmt(v), fill=TEXT, font=FONT_VAL)
             if i % 2 == 0:
-                canvas.create_text(x0 + bar_w / 2, mt + ph + 12, text=d["day"][5:], fill=GRID, font=font)
+                canvas.create_text(x0 + bar_w / 2, mt + ph + 16, text=d["day"][5:], fill=DAY_TEXT, font=FONT_DAY)
         for g in range(5):
             gy = mt + ph - ph * g / 4
             canvas.create_line(ml, gy, ml + pw, gy, fill=GRID, dash=(2, 2))
-            canvas.create_text(ml - 5, gy, text=fmt(max_v * g / 4), anchor="e", fill=TEXT, font=font)
+            canvas.create_text(ml - 6, gy, text=fmt(max_v * g / 4), anchor="e", fill=TEXT, font=FONT_VAL)
         canvas.create_line(ml, mt + ph, ml + pw, mt + ph, fill=TEXT)
         canvas.create_line(ml, mt, ml, mt + ph, fill=TEXT)
+        self._bar_meta[canvas] = {
+            "daily": daily,
+            "value_key": value_key,
+            "fmt": fmt,
+            "color": color,
+            "ml": ml, "mt": mt, "pw": pw, "ph": ph,
+            "slot": slot, "bar_w": bar_w, "bar_ids": bar_ids,
+            "w": w, "h": h,
+        }
+        canvas.bind("<Motion>", lambda e, cv=canvas: self._on_bar_hover(e, cv))
+        canvas.bind("<Leave>", lambda e, cv=canvas: self._on_bar_leave(cv))
+
+    def _on_bar_hover(self, event, canvas):
+        meta = self._bar_meta.get(canvas)
+        if not meta:
+            return
+        x, y = event.x, event.y
+        ml, mt, pw, ph, slot = meta["ml"], meta["mt"], meta["pw"], meta["ph"], meta["slot"]
+        canvas.delete("bar_hl")
+        canvas.delete("bar_tip")
+        for bid in meta["bar_ids"]:
+            canvas.itemconfigure(bid, outline="")
+        if not (ml <= x <= ml + pw and mt <= y <= mt + ph):
+            return
+        n = len(meta["daily"])
+        idx = min(int((x - ml) / slot), n - 1)
+        if idx < 0:
+            return
+        bid = meta["bar_ids"][idx]
+        canvas.itemconfigure(bid, outline="#ffffff", width=2)
+        d = meta["daily"][idx]
+        if meta["value_key"] == "cost":
+            line = f"{d['day']}  消费 ¥{d['cost']:.2f}"
+        else:
+            line = f"{d['day']}  Token {d['tokens']:,}"
+        tx = min(x + 14, meta["w"] - 222)
+        ty = max(y - 34, 10)
+        canvas.create_rectangle(tx, ty, tx + 216, ty + 28, fill="#0b1220", outline="#64748b", tags=("bar_tip",))
+        canvas.create_text(tx + 8, ty + 14, anchor="w", text=line, fill="#ffffff", font=FONT_TIP, tags=("bar_tip",))
+
+    def _on_bar_leave(self, canvas):
+        canvas.delete("bar_hl")
+        canvas.delete("bar_tip")
+        meta = self._bar_meta.get(canvas)
+        if meta:
+            for bid in meta["bar_ids"]:
+                canvas.itemconfigure(bid, outline="")
 
     def _draw_pie(self, canvas, breakdown):
         canvas.delete("all")
-        w, h = _canvas_size(canvas, 300, 220)
-        cx, cy = w * 0.32, h * 0.48
+        w, h = _canvas_size(canvas, 320, 230)
+        cx, cy = w * 0.30, h * 0.48
         r = min(w, h) * 0.36
         items = [
             ("输入(命中缓存)", breakdown["cache_hit"], PIE_COLORS["cache_hit"]),
@@ -230,7 +289,6 @@ class BalanceApp:
         ]
         total = sum(v for _, v, _ in items) or 1
         start = 90.0
-        font = ("Microsoft YaHei", 8)
         for label, v, color in items:
             if v <= 0:
                 continue
@@ -240,16 +298,16 @@ class BalanceApp:
                 start=start, extent=extent, fill=color, outline=BG, width=1,
             )
             start += extent
-        lx = w * 0.62
+        lx = w * 0.58
         ly = h * 0.16
         for label, v, color in items:
             pct = 100.0 * v / total
-            canvas.create_rectangle(lx, ly, lx + 12, ly + 12, fill=color, outline="")
+            canvas.create_rectangle(lx, ly, lx + 14, ly + 14, fill=color, outline="")
             canvas.create_text(
-                lx + 18, ly + 6, anchor="w",
-                text=f"{label}  {pct:.1f}%", fill=TEXT, font=font,
+                lx + 20, ly + 7, anchor="w",
+                text=f"{label}  {pct:.1f}%", fill=TEXT, font=FONT_VAL,
             )
-            ly += 24
+            ly += 28
 
 
 def run_app(interval: int = 30, save: bool = False) -> int:

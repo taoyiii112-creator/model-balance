@@ -31,6 +31,7 @@ h1{font-size:20px}h2{font-size:16px;margin-top:28px}
 table{border-collapse:collapse;width:100%;margin-top:12px}
 th,td{border:1px solid #334155;padding:8px 12px;text-align:left;font-size:14px}
 th{background:#1e293b}.err{color:#f87171}.ok{color:#4ade80}#meta{color:#94a3b8;font-size:13px}
+.note{color:#94a3b8;font-size:13px;margin:6px 0 0}
 .charts{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
 .charts>div{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px}
 .charts p{margin:0 0 6px;font-size:13px;color:#94a3b8}
@@ -46,19 +47,21 @@ th{background:#1e293b}.err{color:#f87171}.ok{color:#4ade80}#meta{color:#94a3b8;f
 </table>
 <h2>用量统计</h2>
 <div class="charts">
-  <div><p>每日消费金额（近 30 天）</p><canvas id="costChart" width="520" height="230"></canvas></div>
-  <div><p>每日 Token 用量（近 30 天）</p><canvas id="tokenChart" width="520" height="230"></canvas></div>
-  <div><p>Token 构成（近 30 天）</p><canvas id="pieChart" width="340" height="230"></canvas></div>
+  <div><p>每日消费金额（近 14 天，悬停柱子看数值）</p><canvas id="costChart" width="560" height="250"></canvas></div>
+  <div><p>每日 Token 用量（近 14 天，悬停柱子看数值）</p><canvas id="tokenChart" width="560" height="250"></canvas></div>
+  <div><p>Token 构成（近 30 天）</p><canvas id="pieChart" width="360" height="250"></canvas></div>
 </div>
+<p class="note">注：Token 用量为本地手动记录（add-usage 录入），非官方接口数据，与官网可能不一致。</p>
 <h2>用量明细（近 30 天）</h2>
-<p id="usage-total" class="muted">-</p>
+<p id="usage-total" class="note">-</p>
 <table id="usage">
 <thead><tr><th>时间</th><th>账户</th><th>模型</th><th>Token</th><th>费用</th></tr></thead>
 <tbody></tbody>
 </table>
 <script>
 const REFRESH = __INTERVAL__;
-const CHART = {bg:'#0f172a', grid:'#334155', text:'#e2e8f0'};
+const CHART = {bg:'#0f172a', grid:'#475569', text:'#f8fafc', day:'#94a3b8'};
+const barMeta = {};
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function money(v){return v == null ? '-' : Number(v).toFixed(4);}
 function drawBars(canvasId, items, valueKey, fmt, color){
@@ -67,28 +70,60 @@ function drawBars(canvasId, items, valueKey, fmt, color){
   const w = cv.width, h = cv.height;
   ctx.clearRect(0,0,w,h);
   ctx.fillStyle = CHART.bg; ctx.fillRect(0,0,w,h);
-  const ml=52, mr=8, mt=16, mb=26;
+  const ml=64, mr=10, mt=20, mb=34;
   const pw=w-ml-mr, ph=h-mt-mb;
   const maxV = Math.max(1, ...items.map(d=>d[valueKey]||0));
   const n = items.length, slot = pw/Math.max(1,n);
-  const barW = Math.min(slot*0.6, 30);
-  ctx.textAlign='center'; ctx.font='10px sans-serif';
+  const barW = Math.min(slot*0.62, 38);
+  ctx.textAlign='center'; ctx.font='13px sans-serif';
   items.forEach((d,i)=>{
     const v=d[valueKey]||0, bh=ph*v/maxV;
     const x0=ml+i*slot+(slot-barW)/2, y0=mt+ph-bh;
     ctx.fillStyle=color; ctx.fillRect(x0,y0,barW,bh);
     ctx.fillStyle=CHART.text;
-    if(bh>14) ctx.fillText(fmt(v), x0+barW/2, y0-3);
-    if(i%2===0) ctx.fillText(d.day.slice(5), x0+barW/2, mt+ph+12);
+    if(bh>18) ctx.fillText(fmt(v), x0+barW/2, y0-6);
+    if(i%2===0){ ctx.fillStyle=CHART.day; ctx.fillText(d.day.slice(5), x0+barW/2, mt+ph+16); }
   });
   ctx.strokeStyle=CHART.grid; ctx.setLineDash([2,2]);
   for(let g=0;g<=4;g++){
     const gy=mt+ph-ph*g/4;
     ctx.beginPath(); ctx.moveTo(ml,gy); ctx.lineTo(ml+pw,gy); ctx.stroke();
     ctx.textAlign='right'; ctx.fillStyle=CHART.text;
-    ctx.fillText(fmt(maxV*g/4), ml-4, gy+3);
+    ctx.fillText(fmt(maxV*g/4), ml-5, gy+4);
   }
   ctx.setLineDash([]);
+  barMeta[canvasId] = {items, valueKey, fmt, color, ml, mt, pw, ph, slot, n, w, h};
+  cv.onmousemove = (e)=>onBarHover(canvasId, e);
+  cv.onmouseleave = ()=>onBarLeave(canvasId);
+}
+function onBarHover(canvasId, e){
+  const m = barMeta[canvasId]; if(!m) return;
+  const rect = e.target.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  if(x < m.ml || x > m.ml+m.pw || y < m.mt || y > m.mt+m.ph){ onBarLeave(canvasId); return; }
+  const idx = Math.min(Math.floor((x-m.ml)/m.slot), m.n-1);
+  if(idx < 0) return;
+  drawBars(canvasId, m.items, m.valueKey, m.fmt, m.color);
+  const cv = document.getElementById(canvasId);
+  const ctx = cv.getContext('2d');
+  const d = m.items[idx];
+  const barW = Math.min(m.slot*0.62, 38);
+  const bx = m.ml+idx*m.slot+(m.slot-barW)/2;
+  const maxV = Math.max(1, ...m.items.map(dd=>dd[m.valueKey]||0));
+  const bh = (m.ph*(d[m.valueKey]||0))/maxV;
+  const by = m.mt+m.ph-bh;
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+  ctx.strokeRect(bx,by,barW,bh);
+  const tip = (m.valueKey==='cost') ? d.day+' 消费 ¥'+Number(d.cost).toFixed(2) : d.day+' Token '+Number(d.tokens).toLocaleString();
+  const tx = Math.min(x+14, cv.width-236), ty = Math.max(y-36, 10);
+  ctx.fillStyle = '#0b1220'; ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1;
+  ctx.fillRect(tx,ty,226,28); ctx.strokeRect(tx,ty,226,28);
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.font = '13px sans-serif';
+  ctx.fillText(tip, tx+8, ty+19);
+}
+function onBarLeave(canvasId){
+  const m = barMeta[canvasId]; if(!m) return;
+  drawBars(canvasId, m.items, m.valueKey, m.fmt, m.color);
 }
 function drawPie(canvasId, bd){
   const cv = document.getElementById(canvasId);
@@ -96,9 +131,9 @@ function drawPie(canvasId, bd){
   const w = cv.width, h = cv.height;
   ctx.clearRect(0,0,w,h);
   ctx.fillStyle = CHART.bg; ctx.fillRect(0,0,w,h);
-  const items=[['输入(命中缓存)',bd.cache_hit,'#22c55e'],['输入(未命中缓存)',bd.cache_miss,'#3b82f6'],['输出',bd.output,'#f97316']];
+  const items=[['输入(命中缓存)',bd.cache_hit,'#4ade80'],['输入(未命中缓存)',bd.cache_miss,'#60a5fa'],['输出',bd.output,'#fb923c']];
   const total=items.reduce((s,x)=>s+x[1],0)||1;
-  const cx=w*0.30, cy=h*0.5, r=Math.min(w,h)*0.36;
+  const cx=w*0.28, cy=h*0.5, r=Math.min(w,h)*0.36;
   let start=Math.PI/2;
   items.forEach(([label,v,color])=>{
     if(v<=0) return;
@@ -108,14 +143,14 @@ function drawPie(canvasId, bd){
     start-=ang;
   });
   let ly=h*0.16;
-  const lx=w*0.62;
-  ctx.font='11px sans-serif'; ctx.textAlign='left';
+  const lx=w*0.58;
+  ctx.font='13px sans-serif'; ctx.textAlign='left';
   items.forEach(([label,v,color])=>{
     const pct=100*v/total;
-    ctx.fillStyle=color; ctx.fillRect(lx,ly+2,12,12);
+    ctx.fillStyle=color; ctx.fillRect(lx,ly+2,14,14);
     ctx.fillStyle=CHART.text;
-    ctx.fillText(label+' '+pct.toFixed(1)+'%', lx+18, ly+12);
-    ly+=22;
+    ctx.fillText(label+' '+pct.toFixed(1)+'%', lx+20, ly+14);
+    ly+=28;
   });
 }
 async function refresh(){
@@ -134,8 +169,9 @@ async function refresh(){
       tb.appendChild(tr);
     });
     const u = await (await fetch('/api/usage')).json();
-    drawBars('costChart', u.daily, 'cost', v=>'¥'+Number(v).toFixed(2), '#f59e0b');
-    drawBars('tokenChart', u.daily, 'tokens', v=>Number(v).toLocaleString(), '#38bdf8');
+    const daily = u.daily.slice(-14);
+    drawBars('costChart', daily, 'cost', v=>'¥'+Number(v).toFixed(2), '#f87171');
+    drawBars('tokenChart', daily, 'tokens', v=>Number(v).toLocaleString(), '#4ade80');
     drawPie('pieChart', u.breakdown);
     const tu = document.querySelector('#usage tbody');
     tu.innerHTML = '';
