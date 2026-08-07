@@ -5,9 +5,9 @@ import queue
 import threading
 import tkinter as tk
 from datetime import datetime, timedelta
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
-from .config import load_accounts, load_env
+from .config import PROJECT_ROOT, load_accounts, load_env
 from .fetcher import fetch_all
 from .storage import (
     add_snapshot,
@@ -16,7 +16,15 @@ from .storage import (
     usage_daily,
     usage_totals,
 )
+from . import __version__
 from .proxy import ensure_proxy
+from .updater import (
+    apply_update,
+    check_for_update,
+    download_asset,
+    fmt_size,
+    relaunch_app,
+)
 
 BG = "#0f172a"
 GRID = "#475569"
@@ -67,6 +75,9 @@ class BalanceApp:
         ttk.Label(bar, textvariable=self.status_var).pack(side="right")
         self.proxy_var = tk.StringVar(value="用量代理: 检查中…")
         ttk.Label(bar, textvariable=self.proxy_var).pack(side="right", padx=(0, 12))
+        self.update_var = tk.StringVar(value="")
+        ttk.Label(bar, textvariable=self.update_var).pack(side="right", padx=(0, 12))
+        ttk.Button(bar, text="检查更新", command=self.manual_check_update).pack(side="left", padx=(8, 0))
 
         # 余额表
         ttk.Label(root, text="账户余额（实时查询）", padding=(8, 4)).pack(anchor="w")
@@ -130,6 +141,7 @@ class BalanceApp:
             self.proxy_var.set("用量代理: 运行中")
         else:
             self.proxy_var.set("用量代理: 未运行")
+        threading.Thread(target=self._auto_check_update, daemon=True).start()
 
         self.root.after(200, self._poll_queue)
         self.refresh_now()
@@ -317,6 +329,110 @@ class BalanceApp:
                 text=f"{label}  {pct:.1f}%", fill=TEXT, font=FONT_VAL,
             )
             ly += 28
+
+
+    # ---------- 更新 ----------
+
+    def _auto_check_update(self):
+        try:
+            info = check_for_update(__version__)
+        except Exception:  # noqa: BLE001
+            info = None
+        if info:
+            self.root.after(0, lambda: self._prompt_update(info))
+        else:
+            self.root.after(0, lambda: self.update_var.set("更新: 已是最新"))
+
+    def manual_check_update(self):
+        self.update_var.set("更新: 检查中…")
+        threading.Thread(target=self._manual_check_worker, daemon=True).start()
+
+    def _manual_check_worker(self):
+        try:
+            info = check_for_update(__version__)
+        except Exception:  # noqa: BLE001
+            self.root.after(0, lambda: self.update_var.set("更新: 检查失败"))
+            return
+        if info:
+            self.root.after(0, lambda: self._prompt_update(info))
+        else:
+            self.root.after(0, lambda: self.update_var.set("更新: 已是最新"))
+
+    def _prompt_update(self, info):
+        self.update_var.set(f"更新: 发现 v{info['tag_name']}")
+        size = fmt_size(info["asset_size"])
+        body = info["body"] or "（发布者未填写更新说明）"
+        msg = (
+            f"发现新版本 v{info['tag_name']}\n"
+            f"当前版本: v{__version__}\n"
+            f"更新包大小: {size}\n\n"
+            f"本次更新内容:\n{body}\n\n"
+            "是否立即下载并更新？"
+        )
+        if messagebox.askyesno("发现更新", msg, parent=self.root, icon="info"):
+            self._download_update(info)
+
+    def _download_update(self, info):
+        win = tk.Toplevel(self.root)
+        win.title("正在更新")
+        win.geometry("380x130")
+        win.transient(self.root)
+        ttk.Label(win, text=f"正在下载 {info['asset_name']}（{fmt_size(info['asset_size'])}）…").pack(pady=(14, 6))
+        self._dl_bar = ttk.Progressbar(win, maximum=100, length=320)
+        self._dl_bar.pack(pady=4)
+        self._dl_label = ttk.Label(win, text="0%")
+        self._dl_label.pack()
+        self._dl_q: queue.Queue = queue.Queue()
+        self._dl_win = win
+        threading.Thread(target=self._dl_worker, args=(info,), daemon=True).start()
+        self.root.after(100, self._poll_download)
+
+    def _dl_worker(self, info):
+        try:
+            dest = PROJECT_ROOT / "data" / "updates" / info["asset_name"]
+            download_asset(info["asset_url"], dest, progress_cb=lambda d, t: self._dl_q.put(("progress", d, t)))
+            self._dl_q.put(("done", dest))
+        except Exception as exc:  # noqa: BLE001
+            self._dl_q.put(("error", str(exc)))
+
+    def _poll_download(self):
+        try:
+            while True:
+                msg = self._dl_q.get_nowait()
+                kind = msg[0]
+                if kind == "progress":
+                    _, done, total = msg
+                    pct = int(done * 100 / total) if total else 0
+                    self._dl_bar["value"] = pct
+                    self._dl_label.config(text=f"{pct}%  {fmt_size(done)}/{fmt_size(total)}")
+                elif kind == "done":
+                    self._dl_win.destroy()
+                    self._apply_and_restart(msg[1])
+                    return
+                elif kind == "error":
+                    self._dl_win.destroy()
+                    messagebox.showerror("更新失败", f"下载失败: {msg[1]}", parent=self.root)
+                    self.update_var.set("更新: 下载失败")
+                    return
+        except queue.Empty:
+            pass
+        self.root.after(100, self._poll_download)
+
+    def _apply_and_restart(self, zip_path):
+        self.update_var.set("更新: 安装中…")
+        try:
+            apply_update(zip_path)
+        except Exception as exc:  # noqa: BLE001
+            messagebox.showerror("更新失败", f"安装失败: {exc}", parent=self.root)
+            self.update_var.set("更新: 安装失败")
+            return
+        messagebox.showinfo("更新完成", "更新已安装，应用即将重启。", parent=self.root)
+        self.update_var.set("更新: 已更新，重启中…")
+        self.root.after(300, self._restart)
+
+    def _restart(self):
+        relaunch_app()
+        self.root.destroy()
 
 
 def run_app(interval: int = 30, save: bool = False) -> int:

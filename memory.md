@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-07：桌面版自动更新完成（updater.py）——启动/手动检查 GitHub Releases，弹窗显示版本/更新内容/包大小，一键下载安装并重启；打包脚本 make_release.py + 打包更新包.bat。
 - 2026-08-07：用量代理自动拉起——桌面应用 / 网页版启动时自动检查并后台启动代理（ensure_proxy），无需手动运行。
 - 2026-08-07：本地 API 代理自动采集完成（proxy 命令）——客户端 base_url 指向代理即自动记录真实用量；pricing 可选估算费用。
 - 2026-08-07：用量图表完成——桌面与网页版均支持"按天消费金额/Token 柱状图"与"输入(命中缓存)/输入(未命中缓存)/输出 扇形图"；数据模型新增缓存命中拆分字段（旧库自动迁移）；CLI add-usage 支持 --cache-hit/--cache-miss。
@@ -30,6 +31,7 @@
 - 展示层（主）：桌面应用 app.py（Tkinter），余额表 + 用量表 + 图表 + 自动刷新。
 - 展示层（可选）：web 命令本地仪表盘。
 - 入口：run.py / python -m modelbalance；Windows 双击 启动仪表盘.bat。
+- 更新：updater.py 从 GitHub Releases 拉取最新版本（api.github.com），下载 zip 更新包、解压覆盖（保留 .env / data / config.json），完成后自动重启。
 - 实时性：桌面应用定时刷新（默认 30 秒，可调）+ watch 命令行轮询。
 
 # 开发规范

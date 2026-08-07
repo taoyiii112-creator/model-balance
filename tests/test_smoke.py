@@ -284,5 +284,61 @@ class TestProxyIntegration(unittest.TestCase):
         self.assertTrue(proxy_is_running(self.proxy.server_port))
         self.assertFalse(proxy_is_running(59999))
 
+class TestUpdater(unittest.TestCase):
+    def test_version_compare(self):
+        from modelbalance.updater import is_newer, parse_version
+
+        self.assertTrue(is_newer("0.1.0", "0.2.0"))
+        self.assertTrue(is_newer("0.2.0", "0.2.1"))
+        self.assertFalse(is_newer("0.2.0", "0.2.0"))
+        self.assertFalse(is_newer("0.3.0", "0.2.0"))
+        self.assertEqual(parse_version("v1.2.3"), (1, 2, 3))
+
+    def test_fmt_size(self):
+        from modelbalance.updater import fmt_size
+
+        self.assertEqual(fmt_size(2 * 1024 * 1024), "2.0 MB")
+        self.assertTrue(fmt_size(500 * 1024).endswith("KB"))
+
+    def test_parse_release(self):
+        from modelbalance.updater import parse_release
+
+        data = {
+            "tag_name": "v0.2.0",
+            "body": "新增更新功能",
+            "assets": [
+                {"name": "model-balance-0.2.0.zip", "size": 2097152, "browser_download_url": "https://example.com/x.zip"},
+                {"name": "README.md", "size": 10},
+            ],
+        }
+        info = parse_release(data)
+        self.assertEqual(info["tag_name"], "v0.2.0")
+        self.assertEqual(info["asset_size"], 2097152)
+        self.assertIsNone(parse_release({"tag_name": "v0.2.0", "assets": []}))
+
+    def test_apply_update_preserves_user_data(self):
+        import zipfile
+
+        from modelbalance.updater import apply_update
+
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            app_dir = base / "app"
+            app_dir.mkdir()
+            (app_dir / ".env").write_text("K=old", encoding="utf-8")
+            (app_dir / "data").mkdir()
+            (app_dir / "config.json").write_text("{}", encoding="utf-8")
+            (app_dir / "old.txt").write_text("old", encoding="utf-8")
+            zip_path = base / "pkg.zip"
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.writestr("new.txt", "new")
+                zf.writestr("src/__init__.py", "x")
+            apply_update(zip_path, app_dir)
+            self.assertEqual((app_dir / "new.txt").read_text(encoding="utf-8"), "new")
+            self.assertTrue((app_dir / "src" / "__init__.py").exists())
+            self.assertTrue((app_dir / ".env").exists())
+            self.assertTrue((app_dir / "config.json").exists())
+            self.assertTrue((app_dir / "data").is_dir())
+
 if __name__ == "__main__":
     unittest.main()

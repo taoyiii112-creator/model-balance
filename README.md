@@ -67,6 +67,22 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 
 不配置 pricing 时，费用列不记录（Token 照常记录）。
 
+## 更新机制（桌面版）
+
+桌面版从 GitHub Releases 自动检查更新：
+
+- 启动时自动检查；也可点窗口右上角"检查更新"
+- 发现新版本会弹窗显示：新版本号、更新内容（Release 说明）、更新包大小
+- 一键下载安装，完成后自动重启
+
+发布新版本（你更新、别人收到）：
+
+1. 修改 `src/modelbalance/__init__.py` 的 `__version__`（如 0.2.1）。
+2. 双击 `打包更新包.bat`（生成 `dist/model-balance-<版本>.zip`）。
+3. 在 GitHub 仓库创建 Release：tag 填 `v<版本>`，上传 zip，描述里写更新内容（App 更新弹窗会显示）。
+
+注意：更新检查访问 `api.github.com`，更新包下载走 GitHub 资产地址（github.com 重定向）。接收方需已装 Python 3.10+；更新时保留用户数据（`.env` / `data` / `config.json`）。
+
 ## 配置说明
 
 ### .env（敏感信息，不提交）
