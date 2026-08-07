@@ -6,9 +6,10 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from .config import PROJECT_ROOT
 from .models import Balance, UsageRecord
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+DATA_DIR = PROJECT_ROOT / "data"
 DB_PATH = DATA_DIR / "balance.db"
 
 SCHEMA = """

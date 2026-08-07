@@ -180,14 +180,22 @@ class BalanceApp:
         threading.Thread(target=self._fetch_worker, daemon=True).start()
 
     def _fetch_worker(self):
-        results = fetch_all(load_accounts())
+        accounts = load_accounts()
+        logger.debug("查询余额开始，账户数=%d", len(accounts))
+        results = fetch_all(accounts)
+        logger.debug("查询余额完成，结果数=%d", len(results))
         self._q.put(results)
 
     def _poll_queue(self):
         try:
             while True:
                 results = self._q.get_nowait()
-                self._render(results)
+                logger.debug("开始渲染界面")
+                try:
+                    self._render(results)
+                except Exception:  # noqa: BLE001
+                    logger.exception("渲染失败")
+                logger.debug("渲染完成")
                 self._fetching = False
                 self.status_var.set(f"最后刷新：{datetime.now().strftime('%H:%M:%S')}")
         except queue.Empty:
@@ -250,10 +258,15 @@ class BalanceApp:
             )
 
         daily = usage_daily(days=14)
+        breakdown = usage_breakdown(since=since)
+        trend = snapshot_history(days=30)
+        logger.debug("图表数据 daily=%s", daily)
+        logger.debug("图表数据 breakdown=%s", breakdown)
+        logger.debug("图表数据 trend 条数=%d", len(trend))
         self._draw_bars(self.cost_canvas, daily, "cost", lambda v: f"¥{v:.2f}", BAR_COLOR_COST)
         self._draw_bars(self.token_canvas, daily, "tokens", lambda v: f"{v:,}", BAR_COLOR_TOKEN)
-        self._draw_pie(self.pie_canvas, usage_breakdown(since=since))
-        self._draw_trend(self.trend_canvas, snapshot_history(days=30))
+        self._draw_pie(self.pie_canvas, breakdown)
+        self._draw_trend(self.trend_canvas, trend)
 
     # ---------- 图表绘制 ----------
 
