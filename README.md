@@ -96,6 +96,7 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 | base_url | openai_compat 必填，如 https://your-relay.example.com |
 | extra.quota_denominator | 中转渠道 quota 换算分母，默认 500000 |
 | extra.quota_currency | 币种，默认 CNY |
+| alert_threshold（顶层） | 低余额提醒阈值（元），默认 5.0；可在应用顶部栏修改，自动保存 |
 
 ## 主流平台余额接口说明
 

@@ -590,5 +590,27 @@ class TestProxyHealth(unittest.TestCase):
                 srv.shutdown()
                 srv.server_close()
 
+class TestConfigSettings(unittest.TestCase):
+    def test_load_save_settings(self):
+        import json
+
+        from modelbalance.config import DEFAULT_ALERT_THRESHOLD, load_settings, save_setting
+
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "config.json"
+            self.assertEqual(load_settings(cfg)["alert_threshold"], DEFAULT_ALERT_THRESHOLD)
+            self.assertTrue(save_setting("alert_threshold", 3.5, cfg))
+            self.assertEqual(load_settings(cfg)["alert_threshold"], 3.5)
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+            self.assertAlmostEqual(data["alert_threshold"], 3.5)
+
+    def test_invalid_threshold_falls_back(self):
+        from modelbalance.config import DEFAULT_ALERT_THRESHOLD, load_settings
+
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "config.json"
+            cfg.write_text('{"alert_threshold": "abc"}', encoding="utf-8")
+            self.assertEqual(load_settings(cfg)["alert_threshold"], DEFAULT_ALERT_THRESHOLD)
+
 if __name__ == "__main__":
     unittest.main()

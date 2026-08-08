@@ -49,6 +49,40 @@ class Account:
         return os.environ.get(self.api_key_env, "").strip()
 
 
+DEFAULT_ALERT_THRESHOLD = 5.0
+
+
+def load_settings(config_path: Path | None = None) -> dict:
+    """读取 config.json 顶层设置（当前仅 alert_threshold），缺失或非法时用默认值。"""
+    cfg_path = config_path or PROJECT_ROOT / "config.json"
+    threshold = DEFAULT_ALERT_THRESHOLD
+    if cfg_path.exists():
+        try:
+            data = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        try:
+            threshold = float(data.get("alert_threshold", DEFAULT_ALERT_THRESHOLD))
+        except (TypeError, ValueError):
+            threshold = DEFAULT_ALERT_THRESHOLD
+    return {"alert_threshold": max(0.0, threshold)}
+
+
+def save_setting(key: str, value, config_path: Path | None = None) -> bool:
+    """把顶层设置写回 config.json（保留 accounts）；文件不存在或写入失败返回 False。"""
+    cfg_path = config_path or PROJECT_ROOT / "config.json"
+    try:
+        if cfg_path.exists():
+            data = json.loads(cfg_path.read_text(encoding="utf-8"))
+        else:
+            data = {}
+        data[key] = value
+        cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def load_accounts(config_path: Path | None = None) -> list[Account]:
     """从 config.json 读取账户清单。"""
     cfg_path = config_path or PROJECT_ROOT / "config.json"

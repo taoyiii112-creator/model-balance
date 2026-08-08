@@ -14,7 +14,7 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 
 from . import __version__
-from .config import PROJECT_ROOT, load_accounts, load_env
+from .config import PROJECT_ROOT, load_accounts, load_env, load_settings, save_setting
 from .fetcher import fetch_all
 from .logutil import get_logger
 from .proxy import ensure_proxy, proxy_is_running
@@ -45,7 +45,6 @@ TREND_COLORS = ["#38bdf8", "#fbbf24", "#a78bfa", "#34d399", "#fb7185", "#22d3ee"
 FONT_VAL = ("Microsoft YaHei", 10)
 FONT_DAY = ("Microsoft YaHei", 10)
 FONT_TIP = ("Microsoft YaHei", 10)
-ALERT_THRESHOLD = 5.0          # 余额低于该值提醒（元）
 SNAPSHOT_INTERVAL_SEC = 1800   # 快照保存最小间隔（秒）
 logger = get_logger("app")
 
@@ -87,6 +86,10 @@ class BalanceApp:
         ttk.Entry(bar, textvariable=self.interval_var, width=6).pack(side="left")
         self.save_var = tk.BooleanVar(value=self.save)
         ttk.Checkbutton(bar, text="保存余额快照", variable=self.save_var).pack(side="left", padx=12)
+        ttk.Label(bar, text="低余额阈值(¥):").pack(side="left", padx=(12, 4))
+        self.alert_threshold = load_settings()["alert_threshold"]
+        self.alert_entry_var = tk.StringVar(value=str(self.alert_threshold))
+        ttk.Entry(bar, textvariable=self.alert_entry_var, width=6).pack(side="left")
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(bar, textvariable=self.status_var).pack(side="right")
         self.proxy_var = tk.StringVar(value="用量代理: 检查中…")
@@ -215,6 +218,17 @@ class BalanceApp:
         self._auto_scheduled = False
         self.refresh_now()
 
+    def _current_threshold(self) -> float:
+        """读取用户设置的阈值；变更时写回 config.json。"""
+        try:
+            threshold = max(0.0, float(self.alert_entry_var.get()))
+        except ValueError:
+            threshold = self.alert_threshold
+        if abs(threshold - self.alert_threshold) > 1e-9:
+            self.alert_threshold = threshold
+            save_setting("alert_threshold", threshold)
+        return threshold
+
     def _maybe_save_snapshot(self, balance):
         """快照限频保存（默认至少间隔 30 分钟），避免刷屏。"""
         last = self._last_snapshot.get(balance.account)
@@ -227,6 +241,7 @@ class BalanceApp:
         for item in self.bal_tree.get_children():
             self.bal_tree.delete(item)
         low_accounts = []
+        threshold = self._current_threshold()
         for r in results:
             if r.ok:
                 b = r.balance
@@ -240,8 +255,9 @@ class BalanceApp:
                 )
                 if self.save:
                     self._maybe_save_snapshot(b)
-                if b.available is not None and b.available < ALERT_THRESHOLD:
+                if b.available is not None and b.available < threshold:
                     low_accounts.append(f"{b.account} ¥{b.available:.2f}")
+
             else:
                 self.bal_tree.insert(
                     "", "end",
