@@ -20,11 +20,17 @@ from .config import PROJECT_ROOT, load_accounts, load_env, load_settings, save_s
 from .fetcher import fetch_all
 from .lan_sync import LanSyncHandler, get_lan_ip, get_sync_token
 from .logutil import get_logger
+from .notify import show_system_toast
 from .proxy import proxy_is_running
 from .storage import (
+    add_notification,
     add_snapshot,
+    list_notifications,
     list_usage_records,
+    mark_all_notifications_read,
+    mark_notification_read,
     snapshot_history,
+    unread_notification_count,
     usage_breakdown,
     usage_daily,
     usage_totals,
@@ -63,6 +69,10 @@ def _canvas_size(canvas, fallback_w: int, fallback_h: int) -> tuple[int, int]:
     return (w if w > 50 else fallback_w, h if h > 50 else fallback_h)
 
 
+def _notify_type_label(type_: str) -> str:
+    return {"low_balance": "低余额", "update_available": "新版本"}.get(type_, type_)
+
+
 class BalanceApp:
     def __init__(self, root: tk.Tk, interval: int = 30, save: bool = True):
         self.root = root
@@ -75,6 +85,7 @@ class BalanceApp:
         self._last_snapshot: dict = {}
         self._proxy_pid: int | None = None
         self._codex_sync_lock = threading.Lock()
+        self._notify_windows: list[tk.Toplevel] = []
 
         root.title(f"模型余额仪表盘 v{__version__}")
         root.geometry("1220x900")
@@ -107,6 +118,9 @@ class BalanceApp:
         ttk.Button(bar, text="复制地址", width=8, command=self._copy_lan_url).pack(side="left", padx=(0, 2))
         ttk.Button(bar, text="复制IP", width=7, command=self._copy_lan_ip).pack(side="left", padx=(0, 2))
         ttk.Button(bar, text="复制令牌", width=8, command=self._copy_lan_token).pack(side="left", padx=(0, 8))
+        self.msg_button = ttk.Button(bar, text="消息", width=8, command=self.open_notifications)
+        self.msg_button.pack(side="left", padx=(0, 8))
+        self._update_msg_button()
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(bar, textvariable=self.status_var).pack(side="right")
         self.proxy_var = tk.StringVar(value="用量代理: 检查中…")
@@ -288,6 +302,180 @@ class BalanceApp:
             add_snapshot(balance)
             self._last_snapshot[balance.account] = now
 
+    # ---------- 消息中心 ----------
+
+    def _notify_low_balance(self, balance, threshold: float) -> None:
+        """低余额：写入消息中心并弹系统通知（同账户同日去重）。"""
+        key = f"low_balance:{balance.account}:{datetime.now():%Y-%m-%d}"
+        title = "低余额提醒"
+        body = (
+            f"{balance.account} 可用余额 {balance.available:.4f} "
+            f"{balance.currency}，低于阈值 {threshold:.2f}。"
+        )
+        try:
+            nid = add_notification("low_balance", title, body, dedupe_key=key)
+        except Exception:  # noqa: BLE001
+            logger.exception("写入低余额消息失败")
+            return
+        if nid:
+            show_system_toast(
+                title,
+                f"{balance.account} 可用余额低于 {threshold:.2f} {balance.currency}",
+            )
+            self._refresh_notify_windows()
+
+    def _notify_update_available(self, info: dict) -> None:
+        """发现新版本：写入消息中心并弹系统通知（按版本号去重）。"""
+        title = f"发现新版本 v{info['tag_name']}"
+        body = info.get("body") or "有新版本可用，可在应用内查看并更新。"
+        try:
+            nid = add_notification(
+                "update_available",
+                title,
+                body,
+                dedupe_key=f"update_available:{info['tag_name']}",
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("写入新版本消息失败")
+            return
+        if nid:
+            show_system_toast(title, "模型余额有新版本可用。")
+            self._refresh_notify_windows()
+
+    def _update_msg_button(self) -> None:
+        try:
+            count = unread_notification_count()
+        except Exception:  # noqa: BLE001
+            count = 0
+        self.msg_button.config(text=f"消息({count})" if count else "消息")
+
+    def open_notifications(self) -> None:
+        """打开消息中心窗口。"""
+        win = tk.Toplevel(self.root)
+        win.title("消息中心")
+        win.geometry("620x460")
+        win.minsize(520, 340)
+        win.transient(self.root)
+        self._notify_windows.append(win)
+        win.protocol("WM_DELETE_WINDOW", lambda: self._close_notify_window(win))
+
+        top = ttk.Frame(win, padding=(8, 8))
+        top.pack(fill="x")
+        ttk.Label(top, text="系统通知消息").pack(side="left")
+        ttk.Button(
+            top, text="全部已读", command=self._mark_all_notifications_read
+        ).pack(side="right")
+        ttk.Button(
+            top, text="刷新", command=lambda: self._reload_notifications(win)
+        ).pack(side="right", padx=(0, 6))
+
+        cols = ("id", "time", "type", "title", "body")
+        tree = ttk.Treeview(win, columns=cols, show="headings", height=14)
+        heads = {
+            "time": "时间",
+            "type": "类型",
+            "title": "标题",
+            "body": "内容",
+        }
+        widths = {"id": 40, "time": 130, "type": 70, "title": 150, "body": 220}
+        for c in cols:
+            tree.heading(c, text=heads[c])
+            tree.column(c, width=widths[c], anchor="w", stretch=c == "body")
+        tree.column("id", width=0, stretch=False)
+        tree.tag_configure("unread", font=("Microsoft YaHei", 10, "bold"))
+        tree.tag_configure("read", foreground="#94a3b8")
+        tree.bind("<Double-1>", lambda e: self._on_notify_open(win, tree, e))
+        tree.bind("<ButtonRelease-1>", lambda e: self._on_notify_click(win, tree, e))
+        tree.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        win.tree = tree
+        self._reload_notifications(win)
+
+    def _close_notify_window(self, win: tk.Toplevel) -> None:
+        if win in self._notify_windows:
+            self._notify_windows.remove(win)
+        win.destroy()
+
+    def _reload_notifications(self, win: tk.Toplevel) -> None:
+        tree = getattr(win, "tree", None)
+        if tree is None:
+            return
+        for item in tree.get_children():
+            tree.delete(item)
+        try:
+            items = list_notifications()
+        except Exception:  # noqa: BLE001
+            logger.exception("读取消息失败")
+            return
+        for n in items:
+            tags = ("unread",) if not n["read"] else ("read",)
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    n["id"],
+                    n["created_at"],
+                    _notify_type_label(n["type"]),
+                    n["title"],
+                    n["body"],
+                ),
+                tags=tags,
+            )
+
+    def _on_notify_click(self, win: tk.Toplevel, tree: ttk.Treeview, event) -> None:
+        """单击标记已读。"""
+        sel = tree.selection()
+        if not sel:
+            return
+        values = tree.item(sel[0], "values")
+        if not values:
+            return
+        try:
+            mark_notification_read(int(values[0]))
+        except Exception:  # noqa: BLE001
+            return
+        self._reload_notifications(win)
+        self._update_msg_button()
+
+    def _on_notify_open(self, win: tk.Toplevel, tree: ttk.Treeview, event) -> None:
+        """双击查看消息详情。"""
+        sel = tree.selection()
+        if not sel:
+            return
+        values = tree.item(sel[0], "values")
+        if not values:
+            return
+        try:
+            mark_notification_read(int(values[0]))
+        except Exception:  # noqa: BLE001
+            pass
+        self._reload_notifications(win)
+        self._update_msg_button()
+        messagebox.showinfo(
+            "消息详情",
+            f"{values[3]}\n\n{values[4]}\n\n时间：{values[1]}",
+            parent=win,
+        )
+
+    def _mark_all_notifications_read(self) -> None:
+        try:
+            mark_all_notifications_read()
+        except Exception:  # noqa: BLE001
+            logger.exception("全部已读失败")
+            return
+        self._refresh_notify_windows()
+
+    def _refresh_notify_windows(self) -> None:
+        """后台线程调用时安全：通过主线程 after 刷新消息窗口与按钮。"""
+        self.root.after(0, self._refresh_notify_windows_now)
+
+    def _refresh_notify_windows_now(self) -> None:
+        for win in list(self._notify_windows):
+            if win.winfo_exists():
+                self._reload_notifications(win)
+            else:
+                self._notify_windows.remove(win)
+        self._update_msg_button()
+
     def _render(self, results):
         for item in self.bal_tree.get_children():
             self.bal_tree.delete(item)
@@ -308,6 +496,7 @@ class BalanceApp:
                     self._maybe_save_snapshot(b)
                 if b.available is not None and b.available < threshold:
                     low_accounts.append(f"{b.account} ¥{b.available:.2f}")
+                    self._notify_low_balance(b, threshold)
 
             else:
                 self.bal_tree.insert(
@@ -512,6 +701,7 @@ class BalanceApp:
             self.root.after(0, lambda: self.update_var.set("更新: 检查失败"))
             return
         if info:
+            self._notify_update_available(info)
             self.root.after(0, lambda: self._prompt_update(info))
         else:
             self.root.after(0, lambda: self.update_var.set("更新: 已是最新"))
@@ -527,6 +717,7 @@ class BalanceApp:
             self.root.after(0, lambda: self.update_var.set("更新: 检查失败"))
             return
         if info:
+            self._notify_update_available(info)
             self.root.after(0, lambda: self._prompt_update(info))
         else:
             self.root.after(0, lambda: self.update_var.set("更新: 已是最新"))

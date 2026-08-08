@@ -36,6 +36,15 @@ CREATE TABLE IF NOT EXISTS balance_snapshots (
     used REAL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    dedupe_key TEXT UNIQUE,
+    read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -56,6 +65,7 @@ def init_db() -> None:
         conn.executescript(SCHEMA)
         _migrate(conn)
     prune_usage_records()  # 用量记录只保留 14 天
+    prune_notifications()  # 消息只保留 90 天
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -303,3 +313,88 @@ def latest_snapshots() -> list[dict]:
                ORDER BY s.account"""
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+# ---------- 消息中心 ----------
+
+
+def add_notification(
+    type_: str,
+    title: str,
+    body: str,
+    dedupe_key: str | None = None,
+) -> int:
+    """写入一条消息；dedupe_key 已存在时忽略并返回 0。"""
+    init_db()
+    created = datetime.now().isoformat(timespec="seconds")
+    with _db() as conn:
+        cur = conn.execute(
+            """INSERT OR IGNORE INTO notifications
+               (type, title, body, dedupe_key, read, created_at)
+               VALUES (?, ?, ?, ?, 0, ?)""",
+            (type_, title, body, dedupe_key, created),
+        )
+        return cur.lastrowid if cur.rowcount else 0
+
+
+def list_notifications(limit: int = 200) -> list[dict]:
+    """按时间倒序返回最近消息。"""
+    init_db()
+    with _db() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM notifications ORDER BY created_at DESC, id DESC LIMIT ?",
+            (max(1, limit),),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def unread_notification_count() -> int:
+    init_db()
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM notifications WHERE read = 0"
+        ).fetchone()
+        return int(row[0])
+
+
+def mark_notification_read(notification_id: int) -> int:
+    init_db()
+    with _db() as conn:
+        cur = conn.execute(
+            "UPDATE notifications SET read = 1 WHERE id = ?",
+            (notification_id,),
+        )
+        return cur.rowcount
+
+
+def mark_all_notifications_read() -> int:
+    init_db()
+    with _db() as conn:
+        cur = conn.execute(
+            "UPDATE notifications SET read = 1 WHERE read = 0"
+        )
+        return cur.rowcount
+
+
+def delete_notification(notification_id: int) -> int:
+    init_db()
+    with _db() as conn:
+        cur = conn.execute(
+            "DELETE FROM notifications WHERE id = ?",
+            (notification_id,),
+        )
+        return cur.rowcount
+
+
+def prune_notifications(keep_days: int = 90) -> int:
+    """删除超过 keep_days 的旧消息（调用方需先 init_db，与 prune_usage_records 一致）。"""
+    cutoff = (datetime.now() - timedelta(days=keep_days)).isoformat(
+        timespec="seconds"
+    )
+    with _db() as conn:
+        cur = conn.execute(
+            "DELETE FROM notifications WHERE created_at < ?",
+            (cutoff,),
+        )
+        return cur.rowcount

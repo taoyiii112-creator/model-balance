@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-09：新增系统通知功能——Windows 系统 Toast（notify.py 经 PowerShell -EncodedCommand 调系统通知，无第三方依赖）+ 应用内消息中心（SQLite notifications 表，dedupe_key 唯一，90 天自动清理）；低余额（按账户按天去重）与发现新版本（按版本号去重）自动写入消息并弹系统通知；顶部栏「消息(N)」按钮显示未读数，单击行标记已读、双击查看详情、支持全部已读。新增 6 项测试，全部 48 项通过；Toast 真实验证通过。
 - 2026-08-09：桌面端 v0.2.4 发布（GitHub Release，经 gh-release-publish 技能授权执行；zip + exe 双资产 + SHA256）。包含：自动采集 Codex 用量（30 秒后台增量入库、14 天保留）、局域网同步显示优化与复制按钮、手机端同步统一 14 天口径、Tcl 中文路径崩溃修复。文档同步更新并推送。
 - 2026-08-09：修复 Tcl 中文路径 bug——Codex 自带 Python 的 Tcl 在含中文的绝对路径（C:\Users\小张\...）下找不到 init.tcl，导致源码版/exe 版无法创建 Tk 窗口（此前"进程存活"验证误判，dist\data\logs\crash.log 暴露）。run.py 启动时把 Tcl/Tk 数据复制到纯 ASCII 路径（D:\codexProject\mb_tcl_stage）并设置 TCL_LIBRARY/TK_LIBRARY；已实测源码版与 exe 版日志均出现"Tk 窗口已创建"，自动采集正常。
 - 2026-08-08：手机端同步接口统一 14 天口径——`lan-sync /api/codex-usage` 现在只返回最近 14 天的 Codex 用量（`codex_usage.filter_recent`，响应带 `keep_days: 14`），与桌面端数据库保留口径一致。42 项测试全过。
@@ -45,6 +46,7 @@
 - 入口：run.py / python -m modelbalance；Windows 双击 启动仪表盘.bat；分发用 dist/model-balance.exe（免 Python）。
 - 更新：updater.py 从 GitHub Releases 拉取最新版本；源码版走 zip 暂存 + apply_staged.py 应用；exe 版下载 exe 资产 + cmd 辅助脚本自替换；均保留 .env / data / config.json；支持自定义更新源（set-update-source / MB_UPDATE_SOURCE）。
 - 实时性：桌面应用定时刷新（默认 30 秒，可调）+ watch 命令行轮询。
+- 系统通知：notify.py 通过 PowerShell（-EncodedCommand，UTF-16LE base64）调用 Windows Toast；消息存 data/balance.db 的 notifications 表（类型/标题/正文/去重键/已读/时间），90 天自动清理
 
 # 开发规范
 
