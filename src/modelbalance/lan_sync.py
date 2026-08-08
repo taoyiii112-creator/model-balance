@@ -2,16 +2,33 @@
 
 运行：python run.py lan-sync（默认 0.0.0.0:8002）
 手机端访问：http://<电脑局域网IP>:8002/api/codex-usage
-鉴权：Authorization: Bearer <config.json 中任一账户的 API Key>
+鉴权：Authorization: Bearer <同步令牌>（见 data/lan_sync_token.txt，启动时也会打印）
 """
 from __future__ import annotations
 
 import json
+import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import urlparse
 
 from .codex_usage import export_json, scan_codex_sessions
-from .config import load_accounts
+
+TOKEN_FILE = (
+    Path(__file__).resolve().parent.parent.parent / "data" / "lan_sync_token.txt"
+)
+
+
+def get_sync_token() -> str:
+    """读取同步令牌；不存在则生成并保存（data/ 已 gitignore，不会提交）。"""
+    TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if TOKEN_FILE.exists():
+        token = TOKEN_FILE.read_text(encoding="utf-8").strip()
+        if token:
+            return token
+    token = secrets.token_hex(16)
+    TOKEN_FILE.write_text(token + "\n", encoding="utf-8")
+    return token
 
 
 class LanSyncHandler(BaseHTTPRequestHandler):
@@ -29,10 +46,7 @@ class LanSyncHandler(BaseHTTPRequestHandler):
     def _authorized(self) -> bool:
         auth = self.headers.get("Authorization", "")
         token = auth.removeprefix("Bearer ").strip() if auth else ""
-        if not token:
-            return False
-        accounts = load_accounts()
-        return any(token == acc.api_key for acc in accounts if acc.api_key)
+        return bool(token) and token == get_sync_token()
 
     def do_GET(self):
         path = urlparse(self.path).path
@@ -56,6 +70,8 @@ def run_lan_sync(host: str = "0.0.0.0", port: int = 8002) -> int:
     server = ThreadingHTTPServer((host, port), LanSyncHandler)
     print(f"局域网同步服务已启动: http://{host}:{port}")
     print("手机端填写电脑局域网 IP（如 192.168.x.x），端口 8002")
+    print(f"同步令牌: {get_sync_token()}（泄露只影响用量数据，可删除 "
+          "data/lan_sync_token.txt 重新生成）")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

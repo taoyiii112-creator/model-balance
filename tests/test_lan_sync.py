@@ -30,11 +30,9 @@ def _request(port: int, auth: str | None = None):
 class TestLanSync(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # 用测试 Key 替换真实账户读取
-        cls._orig_load = lan_sync.load_accounts
-        lan_sync.load_accounts = lambda: [
-            SimpleNamespace(name="test", api_key="test-key-123")
-        ]
+        # 用固定测试令牌替换真实令牌读取
+        cls._orig_token = lan_sync.get_sync_token
+        lan_sync.get_sync_token = lambda: "test-token-123"
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), lan_sync.LanSyncHandler)
         cls.port = cls.server.server_address[1]
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -44,7 +42,7 @@ class TestLanSync(unittest.TestCase):
     def tearDownClass(cls):
         cls.server.shutdown()
         cls.server.server_close()
-        lan_sync.load_accounts = cls._orig_load
+        lan_sync.get_sync_token = cls._orig_token
 
     def test_unauthorized(self):
         status, _ = _request(self.port)
@@ -53,7 +51,7 @@ class TestLanSync(unittest.TestCase):
         self.assertEqual(status2, 401)
 
     def test_authorized_returns_json(self):
-        status, data = _request(self.port, "Bearer test-key-123")
+        status, data = _request(self.port, "Bearer test-token-123")
         self.assertEqual(status, 200)
         self.assertEqual(data["source"], "codex")
         self.assertIn("records", data)

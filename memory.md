@@ -10,7 +10,7 @@
 
 # 当前状态
 
-- 2026-08-08：局域网同步服务完成——lan-sync 命令（0.0.0.0:8002，/api/codex-usage 只读接口，Bearer 鉴权），手机端已联调（一键拉取 Codex 用量）。
+- 2026-08-08：局域网同步服务完成——lan-sync 命令（0.0.0.0:8002，/api/codex-usage 只读接口），鉴权用专用同步令牌（data/lan_sync_token.txt，非 API Key），手机端已联调。
 - 2026-08-08：Codex 本地会话用量提取完成——新增 `codex-usage` 命令（扫描 ~/.codex 会话 JSONL，按 key 去重；汇总 / `--export` 导出 JSON / `--save` 写入本地用量库，note 标记 codex）。
 - 2026-08-08：用量代理改为可选——桌面/网页不再自动拉起，用量统计正式来源为 codex-usage；代理需要时手动 python run.py proxy（保留实时接口能力）。
 - 2026-08-08：token 数据修正——codex-usage 改为按会话累计值 total_token_usage 取增量（消除 1-2% 高估）；清理演示/测试记录；真实 Codex 用量 2847 条入库（默认 14 天保留）；桌面图表默认排除 codex 账户（可开关）；全屏布局修复（1220x900）。
