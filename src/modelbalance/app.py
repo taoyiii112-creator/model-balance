@@ -17,7 +17,7 @@ from . import __version__
 from .config import PROJECT_ROOT, load_accounts, load_env, load_settings, save_setting
 from .fetcher import fetch_all
 from .logutil import get_logger
-from .proxy import ensure_proxy, proxy_is_running
+from .proxy import proxy_is_running
 from .storage import (
     add_snapshot,
     list_usage_records,
@@ -165,12 +165,13 @@ class BalanceApp:
         self.trend_canvas = tk.Canvas(trend_frame, width=1160, height=150, bg=BG, highlightthickness=0)
         self.trend_canvas.pack(fill="both", expand=True)
 
-        # 用量代理自动拉起（无需手动启动）；记录自己拉起的子进程，退出时优雅关闭
-        self._proxy_pid = ensure_proxy(port=8001, quiet=True)
+        # 用量代理为可选工具（用量统计正式来源为 codex-usage）：不再自动拉起，
+        # 需要时手动运行 python run.py proxy；仅显示状态。
+        self._proxy_pid = None
         if proxy_is_running(8001):
-            self.proxy_var.set("用量代理: 运行中")
+            self.proxy_var.set("用量代理: 运行中（手动启动）")
         else:
-            self.proxy_var.set("用量代理: 未运行")
+            self.proxy_var.set("用量代理: 未启用")
         root.protocol("WM_DELETE_WINDOW", self._on_close)
         threading.Thread(target=self._auto_check_update, daemon=True).start()
 
