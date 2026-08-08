@@ -1,3 +1,10 @@
+## 日期：2026-08-09
+
+完成：修复 Tcl 中文路径 bug——Codex 自带 Python 的 Tcl 在中文绝对路径（C:\Users\小张\...）下找不到 init.tcl，Tk 窗口创建失败（此前验证方法误判，实际 exe 一直打不开；dist\data\logs\crash.log 为证）。run.py 启动时自动把 Tcl/Tk 数据复制到纯 ASCII 路径（D:\codexProject\mb_tcl_stage）并设置 TCL_LIBRARY/TK_LIBRARY；源码版与 exe 版均实测通过（日志"Tk 窗口已创建"+ 自动采集正常，无新 crash）。42 项测试全过。
+
+影响：桌面端（源码版和 exe 版）真正可打开窗口，自动采集、局域网同步、图表全部可用。
+
+备注：D:\codexProject\mb_tcl_stage 为 Tcl/Tk ASCII 暂存目录（打包与运行共用，勿删）；dist\data 旧崩溃日志已清理。
 ## 日期：2026-08-08
 
 完成：手机端同步接口统一 14 天口径——`lan-sync /api/codex-usage` 由返回全部历史改为只返回最近 14 天记录（新增 `codex_usage.filter_recent`，响应增加 `keep_days: 14` 字段），与桌面端"数据库只保留 14 天"一致。实测 3295 条记录全部在 14 天内；42 项测试全过（新增过滤用例 + 接口字段断言）。
