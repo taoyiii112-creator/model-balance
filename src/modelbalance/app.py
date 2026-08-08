@@ -372,6 +372,7 @@ class BalanceApp:
         cols = ("id", "time", "type", "title", "body")
         tree = ttk.Treeview(win, columns=cols, show="headings", height=14)
         heads = {
+            "id": "",
             "time": "时间",
             "type": "类型",
             "title": "标题",

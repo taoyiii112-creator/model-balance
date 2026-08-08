@@ -16,5 +16,5 @@
       }
     }
   ],
-  "alert_threshold": 0.5
+  "alert_threshold": 2.0
 }
