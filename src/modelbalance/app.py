@@ -15,6 +15,7 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 
 from . import __version__
+from .codex_usage import sync_codex_usage_to_db
 from .config import PROJECT_ROOT, load_accounts, load_env, load_settings, save_setting
 from .fetcher import fetch_all
 from .lan_sync import LanSyncHandler, get_lan_ip, get_sync_token
@@ -48,6 +49,7 @@ FONT_VAL = ("Microsoft YaHei", 10)
 FONT_DAY = ("Microsoft YaHei", 10)
 FONT_TIP = ("Microsoft YaHei", 10)
 SNAPSHOT_INTERVAL_SEC = 1800   # 快照保存最小间隔（秒）
+CODEX_SYNC_INTERVAL_SEC = 30   # Codex 用量自动采集间隔（秒）
 logger = get_logger("app")
 
 
@@ -72,6 +74,7 @@ class BalanceApp:
         self._bar_meta: dict = {}
         self._last_snapshot: dict = {}
         self._proxy_pid: int | None = None
+        self._codex_sync_lock = threading.Lock()
 
         root.title(f"模型余额仪表盘 v{__version__}")
         root.geometry("1220x900")
@@ -128,9 +131,11 @@ class BalanceApp:
         ttk.Label(root, text="Token 用量记录（近 30 天）", padding=(8, 6)).pack(anchor="w")
         self.usage_summary_var = tk.StringVar(value="-")
         ttk.Label(root, textvariable=self.usage_summary_var, padding=(8, 0)).pack(anchor="w")
+        self.codex_sync_var = tk.StringVar(value="用量采集: 待同步")
+        ttk.Label(root, textvariable=self.codex_sync_var, padding=(8, 0), foreground="#94a3b8").pack(anchor="w")
         ttk.Label(
             root,
-            text="注：Token 用量为本地手动/代理记录（非官方接口数据），与官网可能不一致",
+            text="注：Token 用量来自 Codex 本地会话自动采集（非官方接口数据），与官网可能不一致",
             padding=(8, 0),
             foreground="#94a3b8",
         ).pack(anchor="w")
@@ -184,6 +189,7 @@ class BalanceApp:
         logger.info("BalanceApp.__init__: 初始化完成，进入定时器")
         self.root.after(200, self._poll_queue)
         self.refresh_now()
+        threading.Thread(target=self._codex_sync_loop, daemon=True).start()
 
     def refresh_now(self):
         if self._fetching:
@@ -226,6 +232,36 @@ class BalanceApp:
     def _auto_refresh(self):
         self._auto_scheduled = False
         self.refresh_now()
+
+    def _codex_sync_loop(self):
+        """后台定时采集 Codex 用量：启动即同步一次，之后每 CODEX_SYNC_INTERVAL_SEC 秒一次。"""
+        self._codex_sync_once()
+        while True:
+            time.sleep(CODEX_SYNC_INTERVAL_SEC)
+            self._codex_sync_once()
+
+    def _codex_sync_once(self):
+        """执行一次增量采集；有新记录时刷新用量区显示。"""
+        if not self._codex_sync_lock.acquire(blocking=False):
+            return
+        try:
+            added = sync_codex_usage_to_db()
+        except Exception:  # noqa: BLE001 - 后台采集失败不影响主界面
+            logger.exception("自动采集 Codex 用量失败")
+            self.root.after(0, lambda: self.codex_sync_var.set("用量采集: 失败"))
+            return
+        finally:
+            self._codex_sync_lock.release()
+        if added:
+            logger.info("自动采集 Codex 用量新增 %d 条", added)
+            self.root.after(0, self._render_usage)
+        self.root.after(
+            0,
+            lambda: self.codex_sync_var.set(
+                f"用量采集: {datetime.now().strftime('%H:%M:%S')}"
+                + (f"（新增 {added} 条）" if added else "（已最新）")
+            ),
+        )
 
     def _current_threshold(self) -> float:
         """读取用户设置的阈值；变更时写回 config.json。"""
@@ -274,6 +310,10 @@ class BalanceApp:
                 )
         self.alert_var.set(f"⚠ 低余额提醒: {'、'.join(low_accounts)}" if low_accounts else "")
 
+        self._render_usage()
+
+    def _render_usage(self):
+        """刷新 Token 用量表与图表（余额区不变）。"""
         since = datetime.now() - timedelta(days=14)
         exclude = None if self.include_codex.get() else "codex"
         for item in self.usage_tree.get_children():

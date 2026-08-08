@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-08：桌面端自动采集 Codex 用量——App 启动即同步一次、之后每 30 秒后台增量扫描 ~/.codex 会话入库（批量写入 + 按 note 去重），只保留 14 天；新增 `codex_usage.sync_codex_usage_to_db()` 供 CLI 与 App 共用；CLI `codex-usage --save` 改为同一函数。41 项测试全过。
 - 2026-08-08：局域网同步服务完成——lan-sync 命令（0.0.0.0:8002，/api/codex-usage 只读接口），鉴权用专用同步令牌（data/lan_sync_token.txt，非 API Key），手机端已联调。
 - 2026-08-08：Codex 本地会话用量提取完成——新增 `codex-usage` 命令（扫描 ~/.codex 会话 JSONL，按 key 去重；汇总 / `--export` 导出 JSON / `--save` 写入本地用量库，note 标记 codex）。
 - 2026-08-08：用量代理改为可选——桌面/网页不再自动拉起，用量统计正式来源为 codex-usage；代理需要时手动 python run.py proxy（保留实时接口能力）。
@@ -34,7 +35,7 @@
 - 架构：多提供商适配器模式（providers/ 下按提供商实现 fetch_balance），账户清单在 config.json，密钥放 .env。
 - 存储：SQLite（data/balance.db），usage_records 含 prompt_cache_hit_tokens / prompt_cache_miss_tokens；balance_snapshots 存余额快照。
 - 聚合：storage.usage_daily（按天消费/Token）与 storage.usage_breakdown（缓存命中/未命中/输出）、snapshot_history（趋势）。
-- 自动采集（可选）：proxy.py 本地 OpenAI 兼容代理——按 Authorization 匹配账户、转发上游、解析 usage、按 pricing 估算费用后入库；默认不自动拉起，需手动 python run.py proxy。用量统计正式来源为 codex-usage。
+- 自动采集：桌面端 App 内置后台线程（每 30 秒）调用 `codex_usage.sync_codex_usage_to_db()` 扫描 Codex 本地会话并增量入库，只保留 14 天；proxy.py 本地 OpenAI 兼容代理仍保留为可选渠道（默认不自动拉起，需手动 python run.py proxy），用量统计正式来源为 codex-usage。
 - 图表：桌面应用用 Tkinter Canvas（柱状图、扇形图、余额趋势折线图，柱状图支持悬停提示）；网页版用 Canvas JS。
 - 展示层（主）：桌面应用 app.py（Tkinter）；可选 web 本地仪表盘。
 - 入口：run.py / python -m modelbalance；Windows 双击 启动仪表盘.bat；分发用 dist/model-balance.exe（免 Python）。

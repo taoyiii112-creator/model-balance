@@ -14,7 +14,6 @@ from .models import UsageRecord
 from .storage import (
     add_snapshot,
     add_usage_record,
-    existing_codex_notes,
     init_db,
     list_usage_records,
     usage_breakdown,
@@ -90,7 +89,7 @@ def cmd_usage(args) -> int:
 
 def cmd_codex_usage(args) -> int:
     """提取 Codex 本地会话的真实 Token 用量。"""
-    from .codex_usage import export_json, scan_codex_sessions
+    from .codex_usage import export_json, scan_codex_sessions, sync_codex_usage_to_db
 
     records = scan_codex_sessions()
     print(f"扫描到 {len(records)} 条 Codex 调用记录")
@@ -112,26 +111,8 @@ def cmd_codex_usage(args) -> int:
             json.dump(data, fh, ensure_ascii=False, indent=2)
         print(f"已导出: {args.export}")
     if args.save:
-        existing = existing_codex_notes()
-        added = 0
-        for r in records:
-            note = f"codex:{r.key}"
-            if note in existing:
-                continue
-            add_usage_record(
-                UsageRecord(
-                    account="codex",
-                    model="codex",
-                    prompt_tokens=r.input_tokens,
-                    completion_tokens=r.output_tokens,
-                    prompt_cache_hit_tokens=r.cached_input_tokens,
-                    prompt_cache_miss_tokens=r.cache_miss_tokens,
-                    note=note,
-                    created_at=r.event_time.astimezone(),  # 统一存本地时间，避免显示 UTC
-                )
-            )
-            added += 1
-        print(f"已写入本地用量库 {added} 条（跳过重复 {len(records) - added} 条）")
+        added = sync_codex_usage_to_db()
+        print(f"已写入本地用量库 {added} 条（保留 14 天）")
     return 0
 
 

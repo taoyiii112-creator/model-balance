@@ -12,6 +12,7 @@ from modelbalance.codex_usage import (  # noqa: E402
     export_json,
     parse_session_file,
     scan_codex_sessions,
+    sync_codex_usage_to_db,
 )
 
 
@@ -103,6 +104,39 @@ class TestExport(unittest.TestCase):
             self.assertEqual(len(data["records"]), 2)
             self.assertIn("key", data["records"][0])
             self.assertIn("cache_miss_tokens", data["records"][0])
+
+
+class TestSyncToDb(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._codex_dir = Path(self._tmp.name) / "codex"
+        _write_session(self._codex_dir)
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name) / "db"
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_sync_adds_and_dedups(self):
+        from modelbalance.storage import list_usage_records
+
+        added = sync_codex_usage_to_db(self._codex_dir)
+        self.assertEqual(added, 2)
+        records = list_usage_records(account="codex")
+        self.assertEqual(len(records), 2)
+
+        # 第二次同步应全部跳过
+        added_again = sync_codex_usage_to_db(self._codex_dir)
+        self.assertEqual(added_again, 0)
+        self.assertEqual(len(list_usage_records(account="codex")), 2)
 
 
 if __name__ == "__main__":

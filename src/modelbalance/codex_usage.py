@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -172,3 +172,44 @@ def export_json(records: list[CodexUsageRecord]) -> dict:
         "generated_at": datetime.now().astimezone().isoformat(),
         "records": [r.to_dict() for r in records],
     }
+
+
+def sync_codex_usage_to_db(codex_dir: Path | None = None, keep_days: int = 14) -> int:
+    """扫描 Codex 会话并增量写入本地用量库，随后清理超过 keep_days 的旧记录。
+
+    返回本次新增条数。仅写入 keep_days 内的记录，避免清理后旧记录反复回填。
+    """
+    from .models import UsageRecord
+    from .storage import (
+        add_usage_records_many,
+        existing_codex_notes,
+        init_db,
+        prune_usage_records,
+    )
+
+    init_db()
+    cutoff = datetime.now().astimezone() - timedelta(days=keep_days)
+    records = scan_codex_sessions(codex_dir)
+    existing = existing_codex_notes()
+    to_add: list[UsageRecord] = []
+    for r in records:
+        if r.event_time.astimezone() < cutoff:
+            continue
+        note = f"codex:{r.key}"
+        if note in existing:
+            continue
+        to_add.append(
+            UsageRecord(
+                account="codex",
+                model="codex",
+                prompt_tokens=r.input_tokens,
+                completion_tokens=r.output_tokens,
+                prompt_cache_hit_tokens=r.cached_input_tokens,
+                prompt_cache_miss_tokens=r.cache_miss_tokens,
+                note=note,
+                created_at=r.event_time.astimezone(),  # 统一存本地时间，避免显示 UTC
+            )
+        )
+    added = add_usage_records_many(to_add) if to_add else 0
+    prune_usage_records(keep_days)
+    return added

@@ -91,6 +91,35 @@ def add_usage_record(rec: UsageRecord) -> int:
         return cur.lastrowid
 
 
+def add_usage_records_many(records: list[UsageRecord]) -> int:
+    """批量写入用量记录（单事务），返回写入条数。调用方需先 init_db。"""
+    if not records:
+        return 0
+    with _db() as conn:
+        cur = conn.executemany(
+            """INSERT INTO usage_records
+               (account, model, created_at, prompt_tokens, completion_tokens, total_tokens,
+                cost, note, prompt_cache_hit_tokens, prompt_cache_miss_tokens)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (
+                    rec.account,
+                    rec.model,
+                    rec.created_at.isoformat(timespec="seconds"),
+                    rec.prompt_tokens,
+                    rec.completion_tokens,
+                    rec.total_tokens,
+                    rec.cost,
+                    rec.note,
+                    rec.prompt_cache_hit_tokens,
+                    rec.prompt_cache_miss_tokens,
+                )
+                for rec in records
+            ],
+        )
+        return cur.rowcount
+
+
 def existing_codex_notes() -> set[str]:
     """返回已入库的 codex 记录 note（用于增量去重）。"""
     init_db()
