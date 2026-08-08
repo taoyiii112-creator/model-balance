@@ -127,7 +127,7 @@ def cmd_codex_usage(args) -> int:
                     prompt_cache_hit_tokens=r.cached_input_tokens,
                     prompt_cache_miss_tokens=r.cache_miss_tokens,
                     note=note,
-                    created_at=r.event_time,
+                    created_at=r.event_time.astimezone(),  # 统一存本地时间，避免显示 UTC
                 )
             )
             added += 1
