@@ -1,5 +1,12 @@
 ## 日期：2026-08-08
 
+完成：README 补充局域网同步（lan-sync）使用说明；lan-sync 令牌比较改用 hmac.compare_digest（防时序攻击）。
+
+影响：文档与功能同步；鉴权更稳妥。
+
+备注：——
+## 日期：2026-08-08
+
 完成：局域网同步鉴权升级——改为专用同步令牌（secrets.token_hex 32 位，保存于 data/lan_sync_token.txt，gitignore 不提交；可删除重新生成），不再校验账户 API Key。手机端相应改为填写令牌（安全存储）。测试通过。
 
 影响：局域网抓包最多泄露只读令牌，API Key 不再经过明文网络。

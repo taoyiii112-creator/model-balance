@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import hmac
 import json
 import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -46,7 +47,9 @@ class LanSyncHandler(BaseHTTPRequestHandler):
     def _authorized(self) -> bool:
         auth = self.headers.get("Authorization", "")
         token = auth.removeprefix("Bearer ").strip() if auth else ""
-        return bool(token) and token == get_sync_token()
+        if not token:
+            return False
+        return hmac.compare_digest(token, get_sync_token())
 
     def do_GET(self):
         path = urlparse(self.path).path

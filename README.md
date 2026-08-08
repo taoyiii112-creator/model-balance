@@ -88,6 +88,17 @@ Authorization: Bearer <任一已配置账户的 API Key>
 
 注意：更新检查默认访问 `api.github.com`，更新包下载走 GitHub 资产地址（github.com 重定向）；更新包下载后会做 zip 完整性校验，安装完成后自动清理。接收方：zip 源码版需 Python 3.10+，exe 版免 Python（见下方打包章节）；更新时保留用户数据（`.env` / `data` / `config.json`）。
 
+## 局域网同步（手机端拉取 Codex 用量）
+
+桌面端可向同一局域网内的手机 App 提供 Codex 用量：
+
+1. 启动：双击 `启动局域网同步.bat`，或运行 `python run.py lan-sync`（默认 0.0.0.0:8002）。
+2. 手机端填写电脑局域网 IP（如 192.168.x.x）+ 端口 8002 + 同步令牌。
+3. 同步令牌在 `data/lan_sync_token.txt`（首次启动自动生成，gitignore 不提交；泄露只影响用量数据，删除该文件即可重新生成）。
+4. Windows 首次运行需在防火墙放行 8002 端口。
+
+接口：`GET /api/codex-usage`（Bearer 令牌鉴权，只读，返回 Codex 用量 JSON）。
+
 ## 配置说明
 
 ### .env（敏感信息，不提交）
