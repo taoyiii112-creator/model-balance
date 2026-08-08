@@ -1,11 +1,14 @@
 """从 Codex 本地会话记录提取真实 Token 用量。
 
 数据来源：~/.codex/sessions 与 ~/.codex/archived_sessions 下的 rollout JSONL。
-每个 event_msg（payload.type == "token_count"）代表一轮调用的用量：
-  - cached_input_tokens        → 输入（命中缓存）
-  - input_tokens - cached      → 输入（未命中缓存）
-  - output_tokens              → 输出
-  - total_tokens               → 总 Token
+每个 event_msg（payload.type == "token_count"）代表一轮调用：
+  - 优先按会话累计值 total_token_usage 取增量（当前值 - 上一值），保证求和 = 会话真实总量
+  - total_token_usage 缺失时回退到 last_token_usage（视为单轮增量）
+拆分：
+  - cached_input_tokens   → 输入（命中缓存）
+  - input_tokens - cached → 输入（未命中缓存）
+  - output_tokens         → 输出
+  - total_tokens          → 总 Token
 """
 from __future__ import annotations
 
@@ -63,6 +66,7 @@ def parse_session_file(path: Path) -> tuple[str, str, list[CodexUsageRecord]]:
     session_id = path.stem
     cwd = ""
     records: list[CodexUsageRecord] = []
+    prev_total: tuple[int, int, int, int] | None = None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             line = line.strip()
@@ -84,18 +88,43 @@ def parse_session_file(path: Path) -> tuple[str, str, list[CodexUsageRecord]]:
             if payload.get("type") != "token_count":
                 continue
             info = payload.get("info") or {}
-            usage = info.get("last_token_usage") or {}
-            if not usage:
+            total = info.get("total_token_usage") or {}
+            last = info.get("last_token_usage") or {}
+            if total:
+                cur = (
+                    int(total.get("input_tokens") or 0),
+                    int(total.get("cached_input_tokens") or 0),
+                    int(total.get("output_tokens") or 0),
+                    int(total.get("total_tokens") or 0),
+                )
+                if prev_total is None:
+                    delta = cur
+                else:
+                    # 取增量；若累计值回退（换会话/重置），以当前值为准
+                    delta = tuple(
+                        (c - p) if c >= p else c for c, p in zip(cur, prev_total)
+                    )
+                prev_total = cur
+            elif last:
+                delta = (
+                    int(last.get("input_tokens") or 0),
+                    int(last.get("cached_input_tokens") or 0),
+                    int(last.get("output_tokens") or 0),
+                    int(last.get("total_tokens") or 0),
+                )
+            else:
+                continue
+            if delta[3] <= 0 and delta[0] <= 0 and delta[2] <= 0:
                 continue
             records.append(
                 CodexUsageRecord(
                     session_id=session_id,
                     event_time=_parse_time(obj.get("timestamp") or ""),
                     thread_name="",
-                    input_tokens=int(usage.get("input_tokens") or 0),
-                    cached_input_tokens=int(usage.get("cached_input_tokens") or 0),
-                    output_tokens=int(usage.get("output_tokens") or 0),
-                    total_tokens=int(usage.get("total_tokens") or 0),
+                    input_tokens=delta[0],
+                    cached_input_tokens=delta[1],
+                    output_tokens=delta[2],
+                    total_tokens=delta[3],
                 )
             )
     return session_id, cwd, records

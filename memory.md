@@ -11,6 +11,7 @@
 # 当前状态
 
 - 2026-08-08：Codex 本地会话用量提取完成——新增 `codex-usage` 命令（扫描 ~/.codex 会话 JSONL，按 key 去重；汇总 / `--export` 导出 JSON / `--save` 写入本地用量库，note 标记 codex）。
+- 2026-08-08：token 数据修正——codex-usage 改为按会话累计值 total_token_usage 取增量（消除 1-2% 高估）；清理演示/测试记录；真实 Codex 用量 2847 条入库（默认 14 天保留）；桌面图表默认排除 codex 账户（可开关）；全屏布局修复（1220x900）。
 - 2026-08-08：实时 Token 用量——桌面代理新增 GET /api/v1/usage/realtime（Bearer 认证，minutes/account 参数），桌面应用用量汇总显示最新一条；手机端接入由用户/其他会话负责。
 - 2026-08-08：版本号升至 0.2.3（未发布）——含 v0.2.2 之后新增的版本显示与低余额阈值可配置；发布需用户授权。
 - 2026-08-08：低余额预警阈值改为用户可配置（config.json alert_threshold，应用顶部栏输入框，修改自动保存）。

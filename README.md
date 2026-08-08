@@ -37,6 +37,8 @@ python run.py usage --since 7            # 查看最近 7 天 Token 用量（含
 python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hit 200 --cache-miss 100 --completion 50 --cost 0.5
 ```
 
+`codex-usage` 命令：提取 Codex 本地会话（~/.codex/sessions）的真实 Token 用量——`--export <path>` 导出 JSON 供手机端导入，`--save` 写入本地用量库（account=codex，图表默认隐藏该账户，顶部"含Codex用量"可开关）。用量记录只保留最近 14 天（自动清理）。
+
 `add-usage` 参数：`--prompt`（输入 Token 总数）、`--cache-hit`（输入命中缓存）、`--cache-miss`（输入未命中缓存）、`--completion`（输出）、`--cost`（费用）。提供 cache-hit/miss 时 prompt 自动等于两者之和。
 
 ## 用量自动采集（代理模式）

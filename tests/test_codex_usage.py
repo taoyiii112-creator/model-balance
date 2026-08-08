@@ -52,6 +52,27 @@ class TestParseSessionFile(unittest.TestCase):
             self.assertEqual(second.total_tokens, 1050)
 
 
+    def test_cumulative_total_delta(self):
+        """total_token_usage 为会话累计值时，按增量统计。"""
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "sessions" / "s.jsonl"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(
+                '{"timestamp":"2026-08-02T04:51:19Z","type":"event_msg","payload":'
+                '{"type":"token_count","info":{"total_token_usage":{"input_tokens":13167,'
+                '"cached_input_tokens":0,"output_tokens":119,"total_tokens":13286}}}}\n'
+                '{"timestamp":"2026-08-02T04:55:23Z","type":"event_msg","payload":'
+                '{"type":"token_count","info":{"total_token_usage":{"input_tokens":14167,'
+                '"cached_input_tokens":600,"output_tokens":169,"total_tokens":14336}}}}\n',
+                encoding="utf-8",
+            )
+            _, _, records = parse_session_file(f)
+            self.assertEqual(len(records), 2)
+            self.assertEqual(records[1].input_tokens, 1000)
+            self.assertEqual(records[1].cached_input_tokens, 600)
+            self.assertEqual(records[1].output_tokens, 50)
+            self.assertEqual(records[1].total_tokens, 1050)
+
 class TestScan(unittest.TestCase):
     def test_dedup_and_thread_name(self):
         with tempfile.TemporaryDirectory() as td:

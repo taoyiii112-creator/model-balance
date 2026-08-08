@@ -72,8 +72,8 @@ class BalanceApp:
         self._proxy_pid: int | None = None
 
         root.title(f"模型余额仪表盘 v{__version__}")
-        root.geometry("1220x1180")
-        root.minsize(1000, 1000)
+        root.geometry("1220x900")
+        root.minsize(980, 760)
 
         # 顶部控制栏
         bar = ttk.Frame(root, padding=8)
@@ -90,6 +90,8 @@ class BalanceApp:
         self.alert_threshold = load_settings()["alert_threshold"]
         self.alert_entry_var = tk.StringVar(value=str(self.alert_threshold))
         ttk.Entry(bar, textvariable=self.alert_entry_var, width=6).pack(side="left")
+        self.include_codex = tk.BooleanVar(value=False)
+        ttk.Checkbutton(bar, text="含Codex用量", variable=self.include_codex).pack(side="left", padx=8)
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(bar, textvariable=self.status_var).pack(side="right")
         self.proxy_var = tk.StringVar(value="用量代理: 检查中…")
@@ -141,26 +143,26 @@ class BalanceApp:
         self.cost_frame = ttk.Frame(charts)
         self.cost_frame.pack(side="left", fill="both", expand=True)
         ttk.Label(self.cost_frame, text="每日消费金额（近 14 天，悬停柱子看数值）", padding=(4, 2)).pack(anchor="w")
-        self.cost_canvas = tk.Canvas(self.cost_frame, width=420, height=210, bg=BG, highlightthickness=0)
+        self.cost_canvas = tk.Canvas(self.cost_frame, width=420, height=170, bg=BG, highlightthickness=0)
         self.cost_canvas.pack(fill="both", expand=True)
 
         self.token_frame = ttk.Frame(charts)
         self.token_frame.pack(side="left", fill="both", expand=True)
         ttk.Label(self.token_frame, text="每日 Token 用量（近 14 天，悬停柱子看数值）", padding=(4, 2)).pack(anchor="w")
-        self.token_canvas = tk.Canvas(self.token_frame, width=420, height=210, bg=BG, highlightthickness=0)
+        self.token_canvas = tk.Canvas(self.token_frame, width=420, height=170, bg=BG, highlightthickness=0)
         self.token_canvas.pack(fill="both", expand=True)
 
         self.pie_frame = ttk.Frame(charts)
         self.pie_frame.pack(side="left", fill="both", expand=True)
         ttk.Label(self.pie_frame, text="Token 构成（近 30 天）", padding=(4, 2)).pack(anchor="w")
-        self.pie_canvas = tk.Canvas(self.pie_frame, width=320, height=210, bg=BG, highlightthickness=0)
+        self.pie_canvas = tk.Canvas(self.pie_frame, width=320, height=170, bg=BG, highlightthickness=0)
         self.pie_canvas.pack(fill="both", expand=True)
 
         # 余额趋势区
         trend_frame = ttk.Frame(root)
         trend_frame.pack(fill="both", expand=True, padx=8, pady=(4, 8))
         ttk.Label(trend_frame, text="余额趋势（近 30 天，自动保存快照）", padding=(4, 2)).pack(anchor="w")
-        self.trend_canvas = tk.Canvas(trend_frame, width=1160, height=200, bg=BG, highlightthickness=0)
+        self.trend_canvas = tk.Canvas(trend_frame, width=1160, height=150, bg=BG, highlightthickness=0)
         self.trend_canvas.pack(fill="both", expand=True)
 
         # 用量代理自动拉起（无需手动启动）；记录自己拉起的子进程，退出时优雅关闭
@@ -265,11 +267,12 @@ class BalanceApp:
                 )
         self.alert_var.set(f"⚠ 低余额提醒: {'、'.join(low_accounts)}" if low_accounts else "")
 
-        since = datetime.now() - timedelta(days=30)
+        since = datetime.now() - timedelta(days=14)
+        exclude = None if self.include_codex.get() else "codex"
         for item in self.usage_tree.get_children():
             self.usage_tree.delete(item)
-        totals = usage_totals(since=since)
-        records = list_usage_records(since=since)
+        totals = usage_totals(since=since, exclude=exclude)
+        records = list_usage_records(since=since, exclude=exclude)
         latest_txt = ""
         if records:
             r0 = records[0]
@@ -284,8 +287,8 @@ class BalanceApp:
                 values=(rec["created_at"], rec["account"], rec["model"], rec["total_tokens"], fmt_money(rec["cost"])),
             )
 
-        daily = usage_daily(days=14)
-        breakdown = usage_breakdown(since=since)
+        daily = usage_daily(days=14, exclude=exclude)
+        breakdown = usage_breakdown(since=since, exclude=exclude)
         trend = snapshot_history(days=30)
         logger.debug("图表数据 daily=%s", daily)
         logger.debug("图表数据 breakdown=%s", breakdown)
@@ -299,7 +302,7 @@ class BalanceApp:
 
     def _draw_bars(self, canvas, daily, value_key, fmt, color):
         canvas.delete("all")
-        w, h = _canvas_size(canvas, 420, 210)
+        w, h = _canvas_size(canvas, 420, 170)
         ml, mr, mt, mb = 58, 10, 20, 32
         pw, ph = w - ml - mr, h - mt - mb
         max_v = max((d[value_key] for d in daily), default=0) or 1
@@ -374,7 +377,7 @@ class BalanceApp:
 
     def _draw_pie(self, canvas, breakdown):
         canvas.delete("all")
-        w, h = _canvas_size(canvas, 320, 210)
+        w, h = _canvas_size(canvas, 320, 170)
         cx, cy = w * 0.30, h * 0.48
         r = min(w, h) * 0.36
         items = [
@@ -406,7 +409,7 @@ class BalanceApp:
 
     def _draw_trend(self, canvas, history):
         canvas.delete("all")
-        w, h = _canvas_size(canvas, 1160, 200)
+        w, h = _canvas_size(canvas, 1160, 150)
         ml, mr, mt, mb = 58, 10, 20, 30
         pw, ph = w - ml - mr, h - mt - mb
         if not history:

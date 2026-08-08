@@ -55,6 +55,7 @@ def init_db() -> None:
     with _db() as conn:
         conn.executescript(SCHEMA)
         _migrate(conn)
+    prune_usage_records()  # 用量记录只保留 14 天
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -100,7 +101,11 @@ def existing_codex_notes() -> set[str]:
         return {r[0] for r in rows}
 
 
-def list_usage_records(account: str | None = None, since: datetime | None = None) -> list[dict]:
+def list_usage_records(
+    account: str | None = None,
+    since: datetime | None = None,
+    exclude: str | None = None,
+) -> list[dict]:
     init_db()
     sql = "SELECT * FROM usage_records"
     clauses: list[str] = []
@@ -111,6 +116,9 @@ def list_usage_records(account: str | None = None, since: datetime | None = None
     if since:
         clauses.append("created_at >= ?")
         params.append(since.isoformat(timespec="seconds"))
+    if exclude:
+        clauses.append("account != ?")
+        params.append(exclude)
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY created_at DESC"
@@ -120,9 +128,13 @@ def list_usage_records(account: str | None = None, since: datetime | None = None
         return [dict(r) for r in rows]
 
 
-def usage_totals(account: str | None = None, since: datetime | None = None) -> dict:
+def usage_totals(
+    account: str | None = None,
+    since: datetime | None = None,
+    exclude: str | None = None,
+) -> dict:
     """汇总 Token 与费用。"""
-    records = list_usage_records(account, since)
+    records = list_usage_records(account, since, exclude)
     return {
         "records": len(records),
         "prompt_tokens": sum(r["prompt_tokens"] for r in records),
@@ -134,7 +146,7 @@ def usage_totals(account: str | None = None, since: datetime | None = None) -> d
     }
 
 
-def usage_daily(account: str | None = None, days: int = 30) -> list[dict]:
+def usage_daily(account: str | None = None, days: int = 30, exclude: str | None = None) -> list[dict]:
     """按天聚合消费金额与 Token 数（含无数据的零值天），用于柱状图。"""
     init_db()
     days = max(1, days)
@@ -146,6 +158,9 @@ def usage_daily(account: str | None = None, days: int = 30) -> list[dict]:
     if account:
         sql += " AND account = ?"
         params.append(account)
+    if exclude:
+        sql += " AND account != ?"
+        params.append(exclude)
     sql += " GROUP BY day ORDER BY day"
     with _db() as conn:
         conn.row_factory = sqlite3.Row
@@ -165,7 +180,11 @@ def usage_daily(account: str | None = None, days: int = 30) -> list[dict]:
     return result
 
 
-def usage_breakdown(account: str | None = None, since: datetime | None = None) -> dict:
+def usage_breakdown(
+    account: str | None = None,
+    since: datetime | None = None,
+    exclude: str | None = None,
+) -> dict:
     """Token 构成：输入(命中缓存) / 输入(未命中缓存) / 输出，用于扇形图。"""
     init_db()
     sql = """SELECT COALESCE(SUM(prompt_cache_hit_tokens), 0) AS hit,
@@ -180,6 +199,9 @@ def usage_breakdown(account: str | None = None, since: datetime | None = None) -
     if since:
         clauses.append("created_at >= ?")
         params.append(since.isoformat(timespec="seconds"))
+    if exclude:
+        clauses.append("account != ?")
+        params.append(exclude)
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     with _db() as conn:
@@ -190,6 +212,19 @@ def usage_breakdown(account: str | None = None, since: datetime | None = None) -
         "cache_miss": int(row["miss"]),
         "output": int(row["output"]),
     }
+
+
+def prune_usage_records(keep_days: int = 14) -> int:
+    """删除超过 keep_days 的用量记录，返回删除条数（调用方需先 init_db）。"""
+    cutoff = (datetime.now() - timedelta(days=keep_days)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    with _db() as conn:
+        cur = conn.execute(
+            "DELETE FROM usage_records WHERE created_at < ?",
+            (cutoff.isoformat(timespec="seconds"),),
+        )
+        return cur.rowcount
 
 
 def snapshot_history(account: str | None = None, days: int = 30) -> list[dict]:

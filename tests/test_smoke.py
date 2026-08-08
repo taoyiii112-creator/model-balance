@@ -627,5 +627,65 @@ class TestConfigSettings(unittest.TestCase):
             cfg.write_text('{"alert_threshold": "abc"}', encoding="utf-8")
             self.assertEqual(load_settings(cfg)["alert_threshold"], DEFAULT_ALERT_THRESHOLD)
 
+class TestStorageRetention(unittest.TestCase):
+    def setUp(self):
+        import modelbalance.storage as storage
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_data = storage.DATA_DIR
+        self._orig_db = storage.DB_PATH
+        storage.DATA_DIR = Path(self._tmp.name)
+        storage.DB_PATH = storage.DATA_DIR / "test.db"
+
+    def tearDown(self):
+        import modelbalance.storage as storage
+
+        storage.DATA_DIR = self._orig_data
+        storage.DB_PATH = self._orig_db
+        self._tmp.cleanup()
+
+    def test_exclude_account(self):
+        import modelbalance.storage as storage
+
+        storage.init_db()
+        storage.add_usage_record(UsageRecord(account="codex", model="codex", prompt_tokens=100, completion_tokens=10))
+        storage.add_usage_record(UsageRecord(account="deepseek-main", model="deepseek-chat", prompt_tokens=200, completion_tokens=20))
+        all_records = storage.list_usage_records()
+        self.assertEqual(len(all_records), 2)
+        filtered = storage.list_usage_records(exclude="codex")
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]["account"], "deepseek-main")
+        daily = storage.usage_daily(days=7, exclude="codex")
+        self.assertEqual(daily[-1]["tokens"], 220)
+
+    def test_prune_usage_records(self):
+        import modelbalance.storage as storage
+        from datetime import datetime, timedelta
+
+        storage.init_db()
+        old = (datetime.now() - timedelta(days=20)).isoformat(timespec="seconds")
+        now = datetime.now().isoformat(timespec="seconds")
+        with storage._db() as conn:
+            conn.execute(
+                "INSERT INTO usage_records (account, model, created_at, prompt_tokens, completion_tokens, total_tokens) VALUES (?,?,?,?,?,?)",
+                ("codex", "codex", old, 1, 1, 2),
+            )
+            conn.execute(
+                "INSERT INTO usage_records (account, model, created_at, prompt_tokens, completion_tokens, total_tokens) VALUES (?,?,?,?,?,?)",
+                ("codex", "codex", now, 2, 2, 4),
+            )
+        # 任何 API 调用都会触发 init_db 自动清理：旧记录应被清掉，只剩今天的
+        records = storage.list_usage_records()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["total_tokens"], 4)
+        # 显式 prune：再插入一条旧记录后直接调用（prune 不再触发 init_db）
+        with storage._db() as conn:
+            conn.execute(
+                "INSERT INTO usage_records (account, model, created_at, prompt_tokens, completion_tokens, total_tokens) VALUES (?,?,?,?,?,?)",
+                ("codex", "codex", old, 9, 9, 18),
+            )
+        deleted = storage.prune_usage_records(keep_days=14)
+        self.assertEqual(deleted, 1)
+
 if __name__ == "__main__":
     unittest.main()

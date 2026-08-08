@@ -1,5 +1,12 @@
 ## 日期：2026-08-08
 
+完成：token 用量数据修正——codex-usage 改为按会话累计值取增量（精确到会话总量）；删除 2 条演示/测试记录；真实 Codex 用量 2847 条入库（account=codex）；数据库用量只保留 14 天（init_db 自动清理）；桌面端只显示 14 天 token 用量，图表默认排除 codex 账户（顶部"含Codex用量"开关）；修复全屏化图表被遮挡（窗口 1220x900、图表高度调小）。33 项 smoke 测试 + 4 项 codex 测试通过。
+
+影响：桌面端 token 数据与真实用量一致；codex 海量用量不再淹没 DeepSeek 真实数据（默认隐藏，可开关）。
+
+备注：发布 v0.2.3 已被用户撤回；当前为未发布开发态。
+## 日期：2026-08-08
+
 完成：Codex 本地会话用量提取（桌面端）——新增 `codex-usage` 命令：扫描 ~/.codex/sessions 与 archived_sessions 的 rollout JSONL，解析 token_count 事件（输入/命中缓存/未命中缓存/输出/总 Token），按 key 去重；支持汇总、`--export` 导出 JSON（供手机端导入）、`--save` 写入本地用量库（note 标记 codex）。实测真实数据：2791 条调用、20 会话、总 Token 5.7 亿。新增 3 项测试，全量测试通过。
 
 影响：Codex（DeepSeek）真实用量不再依赖代理或手动记录，历史会话可追溯；为手机端数据共享提供数据源。
