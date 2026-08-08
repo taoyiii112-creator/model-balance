@@ -10,14 +10,12 @@ import hmac
 import json
 import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import urlparse
 
 from .codex_usage import export_json, scan_codex_sessions
+from .config import PROJECT_ROOT
 
-TOKEN_FILE = (
-    Path(__file__).resolve().parent.parent.parent / "data" / "lan_sync_token.txt"
-)
+TOKEN_FILE = PROJECT_ROOT / "data" / "lan_sync_token.txt"
 
 
 def get_sync_token() -> str:
