@@ -278,6 +278,21 @@ class TestProxyIntegration(unittest.TestCase):
         self.assertEqual(recs[0]["prompt_cache_miss_tokens"], 100)
         self.assertEqual(recs[0]["completion_tokens"], 50)
 
+    def test_realtime_endpoint(self):
+        import modelbalance.storage as storage
+
+        storage.add_usage_record(
+            UsageRecord(account="relay-test", model="deepseek-chat", prompt_tokens=5, completion_tokens=3)
+        )
+        req = urlrequest.Request(
+            f"http://127.0.0.1:{self.proxy.server_port}/api/v1/usage/realtime?minutes=60",
+            headers={"Authorization": "Bearer sk-test"},
+        )
+        with urlrequest.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(data["records"][0]["model"], "deepseek-chat")
+
     def test_proxy_is_running(self):
         from modelbalance.proxy import proxy_is_running
 

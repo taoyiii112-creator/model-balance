@@ -47,6 +47,15 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 2. 客户端配置：base_url 改为 `http://127.0.0.1:8001/v1`，API Key 保持原样（必须是 config.json 已配置账户的 Key）。
 3. 每次请求自动写入本地数据库，图表实时更新（note 标记为 proxy）。
 
+实时用量接口（供其他端拉取）：
+
+```
+GET http://127.0.0.1:8001/api/v1/usage/realtime?minutes=60&account=<可选>
+Authorization: Bearer <任一已配置账户的 API Key>
+```
+
+返回最近 N 分钟（默认 60）的用量记录 JSON（账户/模型/时间/输入输出 Token/缓存命中拆分），桌面端已在用量汇总显示最新一条。
+
 可选：在 config.json 账户的 extra 里配置单价（每百万 Token），代理会自动估算费用：
 
 ```json

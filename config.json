@@ -15,5 +15,6 @@
         "quota_currency": "CNY"
       }
     }
-  ]
+  ],
+  "alert_threshold": 0.5
 }

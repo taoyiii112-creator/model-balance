@@ -10,18 +10,19 @@ import json
 import os
 import socket
 import threading
+from datetime import datetime, timedelta
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from .config import PROJECT_ROOT, load_accounts, load_env
 from .logutil import get_logger
 from .models import UsageRecord
-from .storage import add_usage_record
+from .storage import add_usage_record, list_usage_records
 
 PROVIDER_BASE = {
     "openai": "https://api.openai.com",
@@ -89,7 +90,30 @@ class ProxyHandler(BaseHTTPRequestHandler):
             threading.Thread(target=self._shutdown_server, daemon=True).start()
             self._send_json(200, {"ok": True})
             return
+        if path.startswith("/api/v1/usage/realtime"):
+            self._handle_realtime()
+            return
         self._handle("GET")
+
+    def _handle_realtime(self):
+        """实时 Token 用量接口：GET /api/v1/usage/realtime?minutes=60&account=<name>
+
+        需带任一已配置账户的 API Key（Authorization: Bearer xxx）。
+        """
+        account = self._match_account(self.headers.get("Authorization", ""))
+        if account is None:
+            self._send_json(401, {"error": "未识别的 API Key"})
+            return
+        query = parse_qs(urlparse(self.path).query)
+        try:
+            minutes = int((query.get("minutes") or ["60"])[0])
+        except ValueError:
+            minutes = 60
+        minutes = max(1, min(minutes, 1440))
+        acc = (query.get("account") or [None])[0]
+        since = datetime.now() - timedelta(minutes=minutes)
+        records = list_usage_records(account=acc, since=since)[:50]
+        self._send_json(200, {"total": len(records), "records": records})
 
     @staticmethod
     def _shutdown_server(server):

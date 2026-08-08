@@ -269,11 +269,16 @@ class BalanceApp:
         for item in self.usage_tree.get_children():
             self.usage_tree.delete(item)
         totals = usage_totals(since=since)
+        records = list_usage_records(since=since)
+        latest_txt = ""
+        if records:
+            r0 = records[0]
+            latest_txt = f" | 最新 {r0['created_at'][11:19]} {r0['model']} {r0['total_tokens']}t"
         self.usage_summary_var.set(
             f"共 {totals['records']} 条记录 / {totals['total_tokens']} tokens / "
-            f"费用 {totals['cost']:.4f}"
+            f"费用 {totals['cost']:.4f}{latest_txt}"
         )
-        for rec in list_usage_records(since=since)[:20]:
+        for rec in records[:20]:
             self.usage_tree.insert(
                 "", "end",
                 values=(rec["created_at"], rec["account"], rec["model"], rec["total_tokens"], fmt_money(rec["cost"])),
