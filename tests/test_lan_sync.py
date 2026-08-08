@@ -57,5 +57,12 @@ class TestLanSync(unittest.TestCase):
         self.assertIn("records", data)
 
 
+    def test_get_lan_ip(self):
+        from modelbalance.lan_sync import get_lan_ip
+
+        ip = get_lan_ip()
+        self.assertIsInstance(ip, str)
+        self.assertTrue(len(ip) > 0)
+
 if __name__ == "__main__":
     unittest.main()

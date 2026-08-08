@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import queue
 import subprocess
+from http.server import ThreadingHTTPServer
 import sys
 import threading
 import time
@@ -16,6 +17,7 @@ from tkinter import messagebox, ttk
 from . import __version__
 from .config import PROJECT_ROOT, load_accounts, load_env, load_settings, save_setting
 from .fetcher import fetch_all
+from .lan_sync import LanSyncHandler, get_lan_ip, get_sync_token
 from .logutil import get_logger
 from .proxy import proxy_is_running
 from .storage import (
@@ -92,6 +94,10 @@ class BalanceApp:
         ttk.Entry(bar, textvariable=self.alert_entry_var, width=6).pack(side="left")
         self.include_codex = tk.BooleanVar(value=False)
         ttk.Checkbutton(bar, text="含Codex用量", variable=self.include_codex).pack(side="left", padx=8)
+        self.lan_sync_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(bar, text="局域网同步", variable=self.lan_sync_var, command=self._toggle_lan_sync).pack(side="left", padx=8)
+        self.lan_info_var = tk.StringVar(value="")
+        ttk.Label(bar, textvariable=self.lan_info_var).pack(side="left", padx=(4, 8))
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(bar, textvariable=self.status_var).pack(side="right")
         self.proxy_var = tk.StringVar(value="用量代理: 检查中…")
@@ -562,7 +568,37 @@ class BalanceApp:
     def _on_close(self):
         if self._proxy_pid:
             self._stop_spawned_proxy()
+        if self.lan_sync_var.get():
+            self._stop_lan_sync()
         self.root.destroy()
+
+    def _toggle_lan_sync(self):
+        if self.lan_sync_var.get():
+            self._start_lan_sync()
+        else:
+            self._stop_lan_sync()
+
+    def _start_lan_sync(self):
+        try:
+            self.lan_server = ThreadingHTTPServer(("0.0.0.0", 8002), LanSyncHandler)
+        except OSError as exc:
+            self.lan_sync_var.set(False)
+            self.lan_info_var.set(f"启动失败（8002 被占用?）: {exc}")
+            return
+        threading.Thread(target=self.lan_server.serve_forever, daemon=True).start()
+        ip = get_lan_ip()
+        token = get_sync_token()
+        self.lan_info_var.set(f"http://{ip}:8002  令牌: {token}")
+
+    def _stop_lan_sync(self):
+        if getattr(self, "lan_server", None):
+            try:
+                self.lan_server.shutdown()
+                self.lan_server.server_close()
+            except Exception:  # noqa: BLE001
+                pass
+            self.lan_server = None
+        self.lan_info_var.set("")
 
     def _stop_spawned_proxy(self):
         """优雅关闭自己拉起的代理子进程（避免占用文件导致 PyInstaller 清理失败）。"""

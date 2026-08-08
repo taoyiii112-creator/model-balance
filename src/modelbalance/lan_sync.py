@@ -9,11 +9,25 @@ from __future__ import annotations
 import hmac
 import json
 import secrets
+import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .codex_usage import export_json, scan_codex_sessions
 from .config import PROJECT_ROOT
+
+def get_lan_ip() -> str:
+    """自动获取本机局域网 IP（UDP 探测默认网关路由，不发送实际数据）。"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except OSError:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
 
 TOKEN_FILE = PROJECT_ROOT / "data" / "lan_sync_token.txt"
 
