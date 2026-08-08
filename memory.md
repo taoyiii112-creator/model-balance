@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-08：局域网同步显示优化——应用内显示 `IP: <ip>:8002 | 令牌: 前8位…`，并新增"复制地址 / 复制IP / 复制令牌"按钮（复制到剪贴板，状态栏提示）。41 项测试全过。
 - 2026-08-08：桌面端自动采集 Codex 用量——App 启动即同步一次、之后每 30 秒后台增量扫描 ~/.codex 会话入库（批量写入 + 按 note 去重），只保留 14 天；新增 `codex_usage.sync_codex_usage_to_db()` 供 CLI 与 App 共用；CLI `codex-usage --save` 改为同一函数。41 项测试全过。
 - 2026-08-08：局域网同步服务完成——lan-sync 命令（0.0.0.0:8002，/api/codex-usage 只读接口），鉴权用专用同步令牌（data/lan_sync_token.txt，非 API Key），手机端已联调。
 - 2026-08-08：Codex 本地会话用量提取完成——新增 `codex-usage` 命令（扫描 ~/.codex 会话 JSONL，按 key 去重；汇总 / `--export` 导出 JSON / `--save` 写入本地用量库，note 标记 codex）。

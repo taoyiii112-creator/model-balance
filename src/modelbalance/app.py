@@ -100,7 +100,13 @@ class BalanceApp:
         self.lan_sync_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(bar, text="局域网同步", variable=self.lan_sync_var, command=self._toggle_lan_sync).pack(side="left", padx=8)
         self.lan_info_var = tk.StringVar(value="")
-        ttk.Label(bar, textvariable=self.lan_info_var).pack(side="left", padx=(4, 8))
+        ttk.Label(bar, textvariable=self.lan_info_var).pack(side="left", padx=(4, 4))
+        self._lan_ip = ""
+        self._lan_port = 8002
+        self._lan_token = ""
+        ttk.Button(bar, text="复制地址", width=8, command=self._copy_lan_url).pack(side="left", padx=(0, 2))
+        ttk.Button(bar, text="复制IP", width=7, command=self._copy_lan_ip).pack(side="left", padx=(0, 2))
+        ttk.Button(bar, text="复制令牌", width=8, command=self._copy_lan_token).pack(side="left", padx=(0, 8))
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(bar, textvariable=self.status_var).pack(side="right")
         self.proxy_var = tk.StringVar(value="用量代理: 检查中…")
@@ -628,7 +634,10 @@ class BalanceApp:
         threading.Thread(target=self.lan_server.serve_forever, daemon=True).start()
         ip = get_lan_ip()
         token = get_sync_token()
-        self.lan_info_var.set(f"http://{ip}:8002  令牌: {token}")
+        self._lan_ip = ip
+        self._lan_port = 8002
+        self._lan_token = token
+        self.lan_info_var.set(f"IP: {ip}:8002 | 令牌: {token[:8]}…")
 
     def _stop_lan_sync(self):
         if getattr(self, "lan_server", None):
@@ -638,7 +647,34 @@ class BalanceApp:
             except Exception:  # noqa: BLE001
                 pass
             self.lan_server = None
+        self._lan_ip = ""
+        self._lan_token = ""
         self.lan_info_var.set("")
+
+    def _copy_to_clipboard(self, text: str, label: str):
+        """复制文本到剪贴板，并在状态栏提示。"""
+        if not text:
+            self.status_var.set(f"{label}: 未启动局域网同步")
+            return
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        self.root.update()
+        self.status_var.set(f"{label}: 已复制 {text}")
+
+    def _copy_lan_url(self):
+        """复制手机端填写的完整地址 http://IP:端口。"""
+        if not self._lan_ip:
+            self.status_var.set("复制地址: 未启动局域网同步")
+            return
+        self._copy_to_clipboard(f"http://{self._lan_ip}:{self._lan_port}", "复制地址")
+
+    def _copy_lan_ip(self):
+        """复制局域网 IP。"""
+        self._copy_to_clipboard(self._lan_ip, "复制IP")
+
+    def _copy_lan_token(self):
+        """复制完整同步令牌。"""
+        self._copy_to_clipboard(self._lan_token, "复制令牌")
 
     def _stop_spawned_proxy(self):
         """优雅关闭自己拉起的代理子进程（避免占用文件导致 PyInstaller 清理失败）。"""
