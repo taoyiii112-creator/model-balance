@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from datetime import datetime, timedelta
@@ -10,7 +11,15 @@ from .config import load_accounts, load_env
 from .logutil import get_logger
 from .fetcher import fetch_all
 from .models import UsageRecord
-from .storage import add_snapshot, add_usage_record, init_db, list_usage_records, usage_breakdown, usage_totals
+from .storage import (
+    add_snapshot,
+    add_usage_record,
+    existing_codex_notes,
+    init_db,
+    list_usage_records,
+    usage_breakdown,
+    usage_totals,
+)
 from .web import serve
 
 
@@ -76,6 +85,53 @@ def cmd_usage(args) -> int:
             f"p={rec['prompt_tokens']} c={rec['completion_tokens']} t={rec['total_tokens']}"
             f"  费用={rec['cost'] or 0:.4f}  {rec['note']}"
         )
+    return 0
+
+
+def cmd_codex_usage(args) -> int:
+    """提取 Codex 本地会话的真实 Token 用量。"""
+    from .codex_usage import export_json, scan_codex_sessions
+
+    records = scan_codex_sessions()
+    print(f"扫描到 {len(records)} 条 Codex 调用记录")
+    if not records:
+        print("未找到记录（检查 ~/.codex/sessions 与 archived_sessions 是否存在）")
+        return 0
+    sessions = len({r.session_id for r in records})
+    total_in = sum(r.input_tokens for r in records)
+    total_cached = sum(r.cached_input_tokens for r in records)
+    total_out = sum(r.output_tokens for r in records)
+    total = sum(r.total_tokens for r in records)
+    print(
+        f"会话数: {sessions}   输入: {total_in}（命中缓存 {total_cached}）   "
+        f"输出: {total_out}   总 Token: {total}"
+    )
+    if args.export:
+        data = export_json(records)
+        with open(args.export, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=2)
+        print(f"已导出: {args.export}")
+    if args.save:
+        existing = existing_codex_notes()
+        added = 0
+        for r in records:
+            note = f"codex:{r.key}"
+            if note in existing:
+                continue
+            add_usage_record(
+                UsageRecord(
+                    account="codex",
+                    model="codex",
+                    prompt_tokens=r.input_tokens,
+                    completion_tokens=r.output_tokens,
+                    prompt_cache_hit_tokens=r.cached_input_tokens,
+                    prompt_cache_miss_tokens=r.cache_miss_tokens,
+                    note=note,
+                    created_at=r.event_time,
+                )
+            )
+            added += 1
+        print(f"已写入本地用量库 {added} 条（跳过重复 {len(records) - added} 条）")
     return 0
 
 
@@ -213,6 +269,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_db = sub.add_parser("init-db", help="初始化本地数据库")
     p_db.set_defaults(func=cmd_init_db)
+
+    p_codex = sub.add_parser("codex-usage", help="提取 Codex 本地会话 Token 用量")
+    p_codex.add_argument("--export", metavar="PATH", help="导出 JSON 供手机端导入")
+    p_codex.add_argument("--save", action="store_true", help="写入本地用量库")
+    p_codex.set_defaults(func=cmd_codex_usage)
 
     return parser
 

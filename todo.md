@@ -1,6 +1,5 @@
 # 进行中
 
-
 - 多端数据同步方案设计（桌面 / 手机 / 网页共用后端）
 - 接入中转渠道：填 RELAY_API_KEY，并把 config.json 的 base_url 改成真实地址（待用户提供）
 - 可选：OpenAI 官方（填 OPENAI_API_KEY 后验证）
@@ -16,6 +15,7 @@
 
 # 完成
 
+- 2026-08-08 Codex 本地会话用量提取（codex-usage 命令：汇总 / --export JSON / --save 入库，按 key 去重）
 - 2026-08-08 实时 Token 用量：桌面代理 /api/v1/usage/realtime 接口 + 桌面端最新用量展示
 - 2026-08-08 低余额预警阈值用户可配置（config.json alert_threshold + 应用内修改）
 - 2026-08-08 桌面应用内显示当前版本号（窗口标题 + 顶部栏）

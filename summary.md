@@ -1,5 +1,13 @@
 ## 日期：2026-08-08
 
+完成：Codex 本地会话用量提取（桌面端）——新增 `codex-usage` 命令：扫描 ~/.codex/sessions 与 archived_sessions 的 rollout JSONL，解析 token_count 事件（输入/命中缓存/未命中缓存/输出/总 Token），按 key 去重；支持汇总、`--export` 导出 JSON（供手机端导入）、`--save` 写入本地用量库（note 标记 codex）。实测真实数据：2791 条调用、20 会话、总 Token 5.7 亿。新增 3 项测试，全量测试通过。
+
+影响：Codex（DeepSeek）真实用量不再依赖代理或手动记录，历史会话可追溯；为手机端数据共享提供数据源。
+
+备注：手机端「导入 Codex JSON」与局域网同步为下一步。
+
+## 日期：2026-08-08
+
 完成：实时 Token 用量（桌面端）——用量代理新增 GET /api/v1/usage/realtime 接口（需任一账户 Key 认证，支持 minutes / account 参数，返回近 60 分钟记录）；桌面应用用量汇总显示"最新一条"（时间/模型/Token）。31 项测试通过。
 
 影响：实时用量可从代理以 HTTP 方式拉取，供其他端使用（手机端接入由用户/其他会话负责，本会话不实现）。

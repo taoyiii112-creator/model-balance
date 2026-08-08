@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-08：Codex 本地会话用量提取完成——新增 `codex-usage` 命令（扫描 ~/.codex 会话 JSONL，按 key 去重；汇总 / `--export` 导出 JSON / `--save` 写入本地用量库，note 标记 codex）。
 - 2026-08-08：实时 Token 用量——桌面代理新增 GET /api/v1/usage/realtime（Bearer 认证，minutes/account 参数），桌面应用用量汇总显示最新一条；手机端接入由用户/其他会话负责。
 - 2026-08-08：版本号升至 0.2.3（未发布）——含 v0.2.2 之后新增的版本显示与低余额阈值可配置；发布需用户授权。
 - 2026-08-08：低余额预警阈值改为用户可配置（config.json alert_threshold，应用顶部栏输入框，修改自动保存）。
@@ -55,6 +56,7 @@
 
 # 下一步计划
 
+0. Codex 用量打通手机端：手机 App 增加「导入 Codex JSON」入口（按 key 去重写入本地库），再升级局域网一键同步。
 1. 接入中转渠道：用户提供真实 base_url 并填 RELAY_API_KEY 后验证。
 2. 可选：OpenAI 官方 Key 验证。
 3. 为各账户配置 pricing 单价，让代理自动估算费用。

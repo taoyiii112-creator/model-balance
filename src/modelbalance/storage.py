@@ -90,6 +90,16 @@ def add_usage_record(rec: UsageRecord) -> int:
         return cur.lastrowid
 
 
+def existing_codex_notes() -> set[str]:
+    """返回已入库的 codex 记录 note（用于增量去重）。"""
+    init_db()
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT note FROM usage_records WHERE note LIKE 'codex:%'"
+        ).fetchall()
+        return {r[0] for r in rows}
+
+
 def list_usage_records(account: str | None = None, since: datetime | None = None) -> list[dict]:
     init_db()
     sql = "SELECT * FROM usage_records"
