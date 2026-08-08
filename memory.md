@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-08：局域网同步服务完成——lan-sync 命令（0.0.0.0:8002，/api/codex-usage 只读接口，Bearer 鉴权），手机端已联调（一键拉取 Codex 用量）。
 - 2026-08-08：Codex 本地会话用量提取完成——新增 `codex-usage` 命令（扫描 ~/.codex 会话 JSONL，按 key 去重；汇总 / `--export` 导出 JSON / `--save` 写入本地用量库，note 标记 codex）。
 - 2026-08-08：token 数据修正——codex-usage 改为按会话累计值 total_token_usage 取增量（消除 1-2% 高估）；清理演示/测试记录；真实 Codex 用量 2847 条入库（默认 14 天保留）；桌面图表默认排除 codex 账户（可开关）；全屏布局修复（1220x900）。
 - 2026-08-08：实时 Token 用量——桌面代理新增 GET /api/v1/usage/realtime（Bearer 认证，minutes/account 参数），桌面应用用量汇总显示最新一条；手机端接入由用户/其他会话负责。
@@ -57,7 +58,6 @@
 
 # 下一步计划
 
-0. Codex 用量打通手机端：手机 App 增加「导入 Codex JSON」入口（按 key 去重写入本地库），再升级局域网一键同步。
 1. 接入中转渠道：用户提供真实 base_url 并填 RELAY_API_KEY 后验证。
 2. 可选：OpenAI 官方 Key 验证。
 3. 为各账户配置 pricing 单价，让代理自动估算费用。

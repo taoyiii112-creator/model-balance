@@ -17,6 +17,7 @@
 
 # 完成
 
+- 2026-08-08 局域网同步服务（lan-sync：0.0.0.0:8002 /api/codex-usage，Bearer 鉴权，只读）与手机端联调完成
 - 2026-08-08 Codex 本地会话用量提取（codex-usage 命令：汇总 / --export JSON / --save 入库，按 key 去重）
 - 2026-08-08 token 数据修复：codex-usage 按累计值取增量、清理演示记录、真实用量 --save 入库、图表默认排除 codex（含开关）
 - 2026-08-08 桌面端只显示 14 天 token 用量；数据库用量自动只保留 14 天

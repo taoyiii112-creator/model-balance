@@ -135,6 +135,13 @@ def cmd_codex_usage(args) -> int:
     return 0
 
 
+def cmd_lan_sync(args) -> int:
+    """启动局域网同步服务（手机端拉取 Codex 用量）。"""
+    from .lan_sync import run_lan_sync
+
+    return run_lan_sync(host=args.host, port=args.port)
+
+
 def cmd_add_usage(args) -> int:
     hit, miss = args.cache_hit, args.cache_miss
     prompt = args.prompt or (hit + miss)
@@ -274,6 +281,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_codex.add_argument("--export", metavar="PATH", help="导出 JSON 供手机端导入")
     p_codex.add_argument("--save", action="store_true", help="写入本地用量库")
     p_codex.set_defaults(func=cmd_codex_usage)
+
+    p_lan = sub.add_parser("lan-sync", help="启动局域网同步服务（供手机端拉取 Codex 用量）")
+    p_lan.add_argument("--host", default="0.0.0.0", help="监听地址，默认 0.0.0.0")
+    p_lan.add_argument("--port", type=int, default=8002, help="端口，默认 8002")
+    p_lan.set_defaults(func=cmd_lan_sync)
 
     return parser
 
