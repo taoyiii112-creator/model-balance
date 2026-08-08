@@ -39,11 +39,13 @@ python run.py add-usage --account deepseek-main --model deepseek-chat --cache-hi
 
 `codex-usage` 命令：提取 Codex 本地会话（~/.codex/sessions）的真实 Token 用量——`--export <path>` 导出 JSON 供手机端导入，`--save` 写入本地用量库（account=codex，图表默认隐藏该账户，顶部"含Codex用量"可开关）。用量记录只保留最近 14 天（自动清理）。
 
+桌面端已内置**自动采集**：应用启动即同步一次，之后每 30 秒后台增量扫描 Codex 会话并入库（只保留 14 天），无需手动运行 `codex-usage --save`；用量区显示"用量采集: 时间（新增 N 条 / 已最新）"。
+
 `add-usage` 参数：`--prompt`（输入 Token 总数）、`--cache-hit`（输入命中缓存）、`--cache-miss`（输入未命中缓存）、`--completion`（输出）、`--cost`（费用）。提供 cache-hit/miss 时 prompt 自动等于两者之和。
 
 ## 用量数据来源
 
-- **正式来源：`codex-usage`**——从 Codex 本地会话提取真实 Token 用量（`python run.py codex-usage --save` 入库）。
+- **正式来源：`codex-usage`**——从 Codex 本地会话提取真实 Token 用量；桌面端每 30 秒自动采集入库（`python run.py codex-usage --save` 也可手动执行）。
 - **可选：用量代理**——把其他客户端（非 Codex 的工具/脚本）的 base_url 指向本机代理可自动记账；默认不自动启动，需要时手动：
 
 1. 启动代理：双击 `启动用量代理.bat`，或运行 `python run.py proxy`（默认 http://127.0.0.1:8001）。
@@ -92,12 +94,12 @@ Authorization: Bearer <任一已配置账户的 API Key>
 
 桌面端可向同一局域网内的手机 App 提供 Codex 用量：
 
-1. 启动：**桌面应用顶部勾选"局域网同步"即可**（自动显示 `http://<局域网IP>:8002` 与同步令牌，无需命令行）；也可双击 `启动局域网同步.bat` 或运行 `python run.py lan-sync`（默认 0.0.0.0:8002）。
+1. 启动：**桌面应用顶部勾选"局域网同步"即可**（自动显示 `IP: <局域网IP>:8002 | 令牌: 前8位…`，并提供"复制地址 / 复制IP / 复制令牌"按钮，无需命令行）；也可双击 `启动局域网同步.bat` 或运行 `python run.py lan-sync`（默认 0.0.0.0:8002）。注意：应用内开关随 exe 关闭而停止，若需 exe 关闭后手机仍可同步，请用 bat 独立启动。
 2. 手机端填写电脑局域网 IP（如 192.168.x.x）+ 端口 8002 + 同步令牌。
 3. 同步令牌在 `data/lan_sync_token.txt`（首次启动自动生成，gitignore 不提交；泄露只影响用量数据，删除该文件即可重新生成）。
 4. Windows 首次运行需在防火墙放行 8002 端口。
 
-接口：`GET /api/codex-usage`（Bearer 令牌鉴权，只读，返回 Codex 用量 JSON）。
+接口：`GET /api/codex-usage`（Bearer 令牌鉴权，只读，返回最近 14 天 Codex 用量 JSON，响应带 `keep_days: 14`；与桌面端保留口径一致）。
 
 ## 配置说明
 

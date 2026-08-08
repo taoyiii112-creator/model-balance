@@ -3,9 +3,7 @@
 
 
 
-
-
-- 修复 Tcl 中文路径 bug：run.py 启动时把 Tcl/Tk 数据复制到 ASCII 路径，源码版/exe 版均能创建 Tk 窗口（已完成）
+- 发布桌面端 v0.2.4：打包 zip + exe、更新文档并推送、创建 GitHub Release（进行中）
 
 - （本轮 token 数据修复/14 天保留/布局修复/自动采集已完成，待提交）
 

@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-09：桌面端 v0.2.4 发布（GitHub Release，经 gh-release-publish 技能授权执行；zip + exe 双资产 + SHA256）。包含：自动采集 Codex 用量（30 秒后台增量入库、14 天保留）、局域网同步显示优化与复制按钮、手机端同步统一 14 天口径、Tcl 中文路径崩溃修复。文档同步更新并推送。
 - 2026-08-09：修复 Tcl 中文路径 bug——Codex 自带 Python 的 Tcl 在含中文的绝对路径（C:\Users\小张\...）下找不到 init.tcl，导致源码版/exe 版无法创建 Tk 窗口（此前"进程存活"验证误判，dist\data\logs\crash.log 暴露）。run.py 启动时把 Tcl/Tk 数据复制到纯 ASCII 路径（D:\codexProject\mb_tcl_stage）并设置 TCL_LIBRARY/TK_LIBRARY；已实测源码版与 exe 版日志均出现"Tk 窗口已创建"，自动采集正常。
 - 2026-08-08：手机端同步接口统一 14 天口径——`lan-sync /api/codex-usage` 现在只返回最近 14 天的 Codex 用量（`codex_usage.filter_recent`，响应带 `keep_days: 14`），与桌面端数据库保留口径一致。42 项测试全过。
 - 2026-08-08：局域网同步显示优化——应用内显示 `IP: <ip>:8002 | 令牌: 前8位…`，并新增"复制地址 / 复制IP / 复制令牌"按钮（复制到剪贴板，状态栏提示）。41 项测试全过。
