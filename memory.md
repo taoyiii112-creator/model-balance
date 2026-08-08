@@ -10,6 +10,7 @@
 
 # 当前状态
 
+- 2026-08-08：桌面应用内显示当前版本号（窗口标题 + 顶部栏）；多端数据同步方案设计完成（docs/多端数据同步方案设计.md），待用户确认后实施。
 - 2026-08-07：桌面端 v0.2.2 已发布 GitHub Release（zip + exe 双资产），包含：余额趋势图、低余额提醒、exe 打包、日志 / 健康检查、更新暂存机制、冻结模式路径修复、退出时优雅关闭代理。
 - 2026-08-07：exe 打包完成（dist/model-balance.exe 约 12MB，免 Python 分发；冻结模式数据目录指向真实项目根）。
 - 2026-08-07：余额趋势图与低余额提醒（快照默认自动保存）；更新改为"暂存 → 退出 → 安装 → 重启"；代理健康检查与端口占用校验；data/logs/app.log 日志。
@@ -34,7 +35,7 @@
 # 开发规范
 
 - 文档与代码同步维护（README / memory / todo / summary 四件套）。
-- 子项目（如手机 App `D:\codexProject\model_balance_app`）不重复建四件套：仅保留 README.md，进度文档由父项目统一维护。
+- 同一应用的不同端（如手机 App `D:\codexProject\model_balance_app`）各自独立维护完整四件套（README / memory / todo / summary），进度文档不并入父项目，端间关系在 README 末尾「备注 / 相关项目」说明。
 - Git 提交信息用中文，遵循 feat: / fix: / refactor: / docs: / chore: / test: 前缀。
 - 敏感信息（API Key、Token）一律放 .env，永不提交到 Git。
 - 一个提交只做一件事。
@@ -54,5 +55,5 @@
 1. 接入中转渠道：用户提供真实 base_url 并填 RELAY_API_KEY 后验证。
 2. 可选：OpenAI 官方 Key 验证。
 3. 为各账户配置 pricing 单价，让代理自动估算费用。
-4. 多端数据同步（桌面 / 手机共用后端，需设计后端 API）。
+4. 多端数据同步：按已完成的方案设计（docs/多端数据同步方案设计.md）确认部署/存储/认证后，实施 P1 后端 → P2 桌面 → P3 手机。
 5. 分发优化：若 exe 版仍有中文路径临时目录清理弹窗，提供一键启动器（ASCII TMP）。

@@ -72,7 +72,7 @@ class BalanceApp:
         self._last_snapshot: dict = {}
         self._proxy_pid: int | None = None
 
-        root.title("模型余额仪表盘")
+        root.title(f"模型余额仪表盘 v{__version__}")
         root.geometry("1220x1180")
         root.minsize(1000, 1000)
 
@@ -81,6 +81,7 @@ class BalanceApp:
         bar.pack(fill="x")
         ttk.Button(bar, text="立即刷新", command=self.refresh_now).pack(side="left")
         ttk.Button(bar, text="检查更新", command=self.manual_check_update).pack(side="left", padx=(8, 0))
+        ttk.Label(bar, text=f"版本 v{__version__}").pack(side="left", padx=(8, 0))
         ttk.Label(bar, text="刷新间隔(秒):").pack(side="left", padx=(16, 4))
         self.interval_var = tk.StringVar(value=str(self.interval))
         ttk.Entry(bar, textvariable=self.interval_var, width=6).pack(side="left")
