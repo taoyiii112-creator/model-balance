@@ -213,3 +213,9 @@ def sync_codex_usage_to_db(codex_dir: Path | None = None, keep_days: int = 14) -
     added = add_usage_records_many(to_add) if to_add else 0
     prune_usage_records(keep_days)
     return added
+
+
+def filter_recent(records: list[CodexUsageRecord], keep_days: int = 14) -> list[CodexUsageRecord]:
+    """只保留最近 keep_days 天内的记录（与数据库保留口径一致）。"""
+    cutoff = datetime.now().astimezone() - timedelta(days=keep_days)
+    return [r for r in records if r.event_time.astimezone() >= cutoff]

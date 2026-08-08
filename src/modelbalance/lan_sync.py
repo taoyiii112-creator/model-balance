@@ -13,7 +13,7 @@ import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from .codex_usage import export_json, scan_codex_sessions
+from .codex_usage import export_json, filter_recent, scan_codex_sessions
 from .config import PROJECT_ROOT
 
 def get_lan_ip() -> str:
@@ -76,7 +76,9 @@ class LanSyncHandler(BaseHTTPRequestHandler):
             return
         try:
             records = scan_codex_sessions()
-            self._send_json(export_json(records))
+            data = export_json(filter_recent(records))
+            data["keep_days"] = 14
+            self._send_json(data)
         except Exception as exc:  # noqa: BLE001 - 服务端兜底
             self._send_json({"error": f"提取失败: {exc}"}, 500)
 

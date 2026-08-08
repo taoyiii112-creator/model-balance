@@ -4,16 +4,19 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from modelbalance.codex_usage import (  # noqa: E402
     export_json,
+    filter_recent,
     parse_session_file,
     scan_codex_sessions,
     sync_codex_usage_to_db,
 )
+from modelbalance.codex_usage import CodexUsageRecord  # noqa: E402
 
 
 SAMPLE = """\
@@ -137,6 +140,21 @@ class TestSyncToDb(unittest.TestCase):
         added_again = sync_codex_usage_to_db(self._codex_dir)
         self.assertEqual(added_again, 0)
         self.assertEqual(len(list_usage_records(account="codex")), 2)
+
+
+class TestFilterRecent(unittest.TestCase):
+    def test_keeps_only_recent(self):
+        now = datetime.now().astimezone()
+        rec_new = CodexUsageRecord(
+            session_id="s1", event_time=now, thread_name="t",
+            input_tokens=1, cached_input_tokens=0, output_tokens=1, total_tokens=2,
+        )
+        rec_old = CodexUsageRecord(
+            session_id="s1", event_time=now - timedelta(days=20), thread_name="t",
+            input_tokens=1, cached_input_tokens=0, output_tokens=1, total_tokens=2,
+        )
+        result = filter_recent([rec_old, rec_new])
+        self.assertEqual(result, [rec_new])
 
 
 if __name__ == "__main__":

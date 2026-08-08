@@ -55,6 +55,7 @@ class TestLanSync(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["source"], "codex")
         self.assertIn("records", data)
+        self.assertEqual(data.get("keep_days"), 14)
 
 
     def test_get_lan_ip(self):
